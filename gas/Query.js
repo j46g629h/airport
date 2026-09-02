@@ -68,7 +68,13 @@ function queryByDate(params) {
 
   var iso = isoDate_(d);
   var items = filterForUser_(readIndex_(), function (r) { return r.tanggal_iso === iso; });
-  return ok_({ mode: 'date', keyword: isoToDisplay_(iso), items: items, total: items.length });
+
+  // ⚠️ 查過去的日期一定是 0 筆（規則 2），但「查不到資料」這句話會讓人
+  //    以為系統壞了。明講「那一天已經過去了」才對得上他實際遇到的事。
+  var past = (iso < isoDate_(today_()));
+
+  return ok_({ mode: 'date', keyword: isoToDisplay_(iso), past: past,
+               items: items, total: items.length });
 }
 
 
@@ -114,13 +120,18 @@ function filterForUser_(index, match) {
  */
 function toPublicItem_(r) {
   var pending = (r.status_code === 'PENDING');
+  // ⚠️ 用「算出來的」狀態，不是 Sheet 上存的那個。
+  //    Sheet 上的狀態要靠人維護，時間過了不會自己變；
+  //    Status.js 的排程每小時會把它寫回去，但那有最多一小時的落差，
+  //    這裡即時算過就不會有「明明飛機飛走了還顯示已排定」的情況。
+  var status = effectiveStatus_(r.status_code, r.tanggal_iso, r.etd_eta);
 
   return {
     id:          r.booking_id,
     // 待定的不給日期，只給狀態（規則 3）
     tanggal:     pending ? '' : isoToDisplay_(r.tanggal_iso),
     arah:        r.arah_code,                       // PICKUP / DROPOFF，文字由前端依語言決定
-    status:      r.status_code,
+    status:      status,
     flight:      r.flight,
     etd_eta:     r.etd_eta,
     dari_pci:    pending ? '' : r.dari_pci,

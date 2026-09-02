@@ -181,6 +181,41 @@ function parseDariPci_(text, tanggalDate) {
   return null;
 }
 
+/**
+ * 這一趟「算是過去了」的時間點。
+ *
+ * ⚠️ 全專案只有這一個地方判斷「過去了沒」，Query.js 顯示用的、
+ *    Status.js 寫回 Sheet 用的都呼叫它。
+ *    兩邊各寫一套的話，遲早會出現「畫面說已完成、Sheet 說已排定」。
+ *
+ * 沒有起降時間就取那一天的 23:59——寧可晚一點才算過去，
+ * 也不要在人還在等車的時候就把他的行程標成已完成。
+ */
+function flightEndsAt_(tanggalIso, etdEta) {
+  var d = String(tanggalIso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!d) return null;
+  var t = String(etdEta || '').match(/^(\d{1,2}):(\d{2})$/);
+  var hh = t ? Number(t[1]) : 23;
+  var mm = t ? Number(t[2]) : 59;
+  return new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]), hh, mm);
+}
+
+/**
+ * 依時間推算出來的「實際狀態」。
+ *
+ * 已排定的行程，時間過了就是已完成——沒有人會為了每一筆去 Sheet 上手動改，
+ * 不自動判斷的話那個欄位對過去的資料就永遠是錯的。
+ *
+ * ⚠️ 只動 SCHEDULED。已取消、待定、已改期都是人刻意設定的決定，
+ *    程式不可以覆蓋——把一筆「已取消」自動改成「已完成」會讓人以為車來過了。
+ */
+function effectiveStatus_(statusCode, tanggalIso, etdEta) {
+  if (statusCode !== 'SCHEDULED') return statusCode;
+  var end = flightEndsAt_(tanggalIso, etdEta);
+  if (end && end.getTime() < new Date().getTime()) return 'DONE';
+  return statusCode;
+}
+
 /** 今天（只有年月日） */
 function today_() {
   var n = new Date();

@@ -41,6 +41,7 @@ const I18N = {
     'result.empty':    'Tidak ada jadwal yang akan datang.',
     'result.emailHint':'Coba kata kunci lain, atau hubungi bagian GA.',
     'result.range':    'Hanya menampilkan jadwal mulai hari ini. Jadwal yang sudah lewat tidak ditampilkan.',
+    'result.past':     'Tanggal yang Anda cari sudah lewat. Hanya jadwal mulai hari ini yang dapat dicari.',
 
     'arah.PICKUP':  'Jemput',
     'arah.DROPOFF': 'Antar',
@@ -112,6 +113,7 @@ const I18N = {
     'result.empty':    '沒有即將到來的行程。',
     'result.emailHint':'換個關鍵字試試，或洽總務。',
     'result.range':    '只顯示今天以後的行程，已經過去的不會出現。',
+    'result.past':     '您查詢的日期已經過去了。只能查詢今天以後的行程。',
 
     'arah.PICKUP':  '接機',
     'arah.DROPOFF': '送機',

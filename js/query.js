@@ -173,9 +173,13 @@ function renderResult(data) {
     const box = resultBox();
 
     if (!items.length) {
+      // 查過去的日期一定是 0 筆。這時候講「查不到資料」會讓人以為系統壞了，
+      // 要直接說「那一天已經過去了」——訊息要對得上他實際遇到的事。
+      var hint = data.past ? t('result.past')
+               : (data.mode === 'email' ? t('result.emailHint') : '');
       box.innerHTML =
         '<div class="msg msg--empty"><p>' + esc(t('result.empty')) + '</p>' +
-        (data.mode === 'email' ? '<p>' + esc(t('result.emailHint')) + '</p>' : '') +
+        (hint ? '<p>' + esc(hint) + '</p>' : '') +
         '</div>';
       return;
     }

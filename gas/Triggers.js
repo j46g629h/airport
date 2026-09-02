@@ -15,7 +15,9 @@
 /** 這個專案要裝哪些排程。新增時加在這裡，然後重跑 installTriggers()。 */
 var TRIGGER_PLAN = [
   { fn: 'rebuildIndexIfDirty', every: 'minutes', n: 5,
-    why: '有人改過才重建 _INDEX。沒改過就 0.1 秒結束——無條件重建會超出每日配額' }
+    why: '有人改過才重建 _INDEX。沒改過就 0.1 秒結束——無條件重建會超出每日配額' },
+  { fn: 'markPastAsDone', every: 'hours', n: 1,
+    why: '把時間已經過去的「已排定」改成「已完成」，讓 Sheet 上的值跟使用者畫面一致' }
 ];
 
 
