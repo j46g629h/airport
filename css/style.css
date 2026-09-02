@@ -242,9 +242,11 @@ a { color: var(--action); }
   min-height: 1.6em;
 }
 
-input[type="email"],
-input[type="text"],
-input[type="date"] {
+/* ⚠️ 不要列舉 type。原本寫成 input[type="email"], [type="text"], [type="date"]，
+   結果密碼欄因為沒被列到，掉回瀏覽器預設寬度（約 20 字元），
+   跟旁邊的帳號欄一寬一窄。日後加 tel / number 也會再破一次同樣的洞。
+   改成「.field 裡面的輸入框都算」，只排除本來就不該是滿版的勾選類。 */
+.field input:not([type="checkbox"]):not([type="radio"]) {
   width: 100%;
   min-height: var(--tap-min);
   padding: 10px 12px;

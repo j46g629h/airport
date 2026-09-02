@@ -10,7 +10,7 @@
 
 var SYSTEM_INFO = {
   name: '機場接送系統',
-  version: '0.7',
+  version: '0.8',
   timezone: 'Asia/Jakarta',
   locale: 'id_ID'
 };

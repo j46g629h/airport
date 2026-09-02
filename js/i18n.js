@@ -309,15 +309,22 @@ function renderFooter() {
   const box = document.getElementById('footInfo');
   if (!box) return;
 
-  const parts = [];
+  const lines = [];
   const by = (SYSTEM_INFO.maintainer && SYSTEM_INFO.maintainer[currentLang]) || '';
-  if (by) parts.push(t('foot.by') + colon() + by);
-  if (SYSTEM_INFO.contact) parts.push(t('foot.ext') + ' ' + SYSTEM_INFO.contact);
+  if (by) lines.push(t('foot.by') + colon() + by);
+  if (SYSTEM_INFO.contact) lines.push(t('foot.ext') + ' ' + SYSTEM_INFO.contact);
   // 'v' 與「系統版本」這幾個字只在顯示時加，存的是純數字（見 js/config.js）
-  parts.push(t('foot.version') + ' v' + SYSTEM_INFO.version);
-  if (SYSTEM_INFO.year) parts.push(SYSTEM_INFO.year);
+  lines.push(t('foot.version') + ' v' + SYSTEM_INFO.version +
+             (SYSTEM_INFO.year ? ' · ' + SYSTEM_INFO.year : ''));
 
-  box.textContent = parts.join(' · ');
+  // 一行一個項目，置中。用 DOM 建，不用 innerHTML——
+  // 維護單位是設定檔來的字串，走 innerHTML 等於多開一個沒必要的洞。
+  box.textContent = '';
+  lines.forEach(function (line, i) {
+    const row = document.createElement('div');
+    row.textContent = line + (i < lines.length - 1 ? ' ·' : '');
+    box.appendChild(row);
+  });
 
   const admin = document.getElementById('footAdmin');
   if (admin) admin.textContent = t('foot.admin');
