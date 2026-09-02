@@ -1,0 +1,18 @@
+# 換行字元正規化
+#
+# ⚠️ 這個專案在 Windows 公司電腦 ↔ macOS 私人電腦之間切換。
+#    沒有這個檔案的話，換一台機器 pull 下來，整批檔案會因為
+#    換行字元不同而顯示成「每一行都改過」——真正的改動會被淹沒在裡面，
+#    而且 git blame 會全部指向那一次無意義的提交。
+#
+# 做法：git 倉庫裡一律存 LF，簽出時交給各平台自己處理。
+
+* text=auto eol=lf
+
+# 二進位檔不要碰
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.pdf   binary
+*.xls   binary
+*.xlsx  binary
