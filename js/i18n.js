@@ -5,6 +5,9 @@
  *    寫死的那幾句在切換語言時不會變，而且很難找——
  *    通常是使用者反映「有一句沒翻到」才發現。
  *
+ * ⚠️ 後端的錯誤也是回「代碼」而不是句子（見 gas/Query.js），
+ *    因為後端不知道使用者現在把介面切成哪一種語言。翻譯在這裡做。
+ *
  * 用法：
  *   HTML 上加 data-i18n="key"，切換語言時由 applyLang() 自動填。
  *   JS 裡用 t('key')。
@@ -13,32 +16,31 @@
 const I18N = {
   id: {
     'app.name':        'Antar Jemput Bandara',
-    'app.subtitle':    'PCI adidas',
 
     'home.query.title': 'Cek Jadwal Saya',
     'home.query.desc':  'Masukkan email untuk melihat jadwal antar jemput Anda',
-    'home.list.title':  'Cari per Tanggal / Nomor Penerbangan',
+    'home.list.title':  'Cari per Tanggal / NO Pesawat',
     'home.list.desc':   'Lihat siapa saja yang berangkat pada hari atau penerbangan yang sama',
 
     'query.title':     'Cek Jadwal',
     'query.tab.email': 'Email',
-    'query.tab.date':  'Tanggal',
-    'query.tab.flight':'Penerbangan',
+    'query.tab.date':  'Tanggal Pesawat',
+    'query.tab.flight':'NO Pesawat',
 
     'query.email.label': 'Alamat email',
-    'query.email.hint':  'Email yang terdaftar. Keluarga yang memakai email yang sama akan ikut tampil.',
-    'query.date.label':  'Tanggal penerbangan',
+    'query.email.hint':  'Tidak perlu lengkap — ketik sebagian saja (minimal 3 huruf). Keluarga yang memakai email yang sama akan ikut tampil.',
+    'query.date.label':  'Tanggal Pesawat',
     'query.date.hint':   'Menampilkan semua orang pada tanggal tersebut.',
-    'query.flight.label':'Nomor penerbangan',
+    'query.flight.label':'NO Pesawat',
     'query.flight.hint': 'Contoh: CI761, CX798. Menampilkan semua orang di penerbangan yang sama.',
     'query.submit':      'Cari',
     'query.searching':   'Mencari…',
 
     'result.title':    'Hasil',
     'result.count':    '{n} data',
-    'result.empty':    'Tidak ada data yang cocok.',
-    'result.emailHint':'Pastikan email sudah benar, atau hubungi bagian GA.',
-    'result.range':    'Hanya menampilkan data 3 bulan terakhir dan yang akan datang.',
+    'result.empty':    'Tidak ada jadwal yang akan datang.',
+    'result.emailHint':'Coba kata kunci lain, atau hubungi bagian GA.',
+    'result.range':    'Hanya menampilkan jadwal mulai hari ini. Jadwal yang sudah lewat tidak ditampilkan.',
 
     'arah.PICKUP':  'Jemput',
     'arah.DROPOFF': 'Antar',
@@ -49,16 +51,14 @@ const I18N = {
     'status.PENDING':   'Menunggu',
     'status.CANCELLED': 'Batal',
 
-    'f.date':      'Tanggal',
     'f.pending':   'Tanggal belum ditentukan, hubungi bagian GA',
     'f.asal':      'Semula',
-    'f.flight':    'Penerbangan',
+    'f.flight':    'NO Pesawat',
     'f.etd':       'Jam pesawat',
     'f.pickup':    'Jam dari PCI',
     'f.titik':     'Titik jemput',
     'f.dorm':      'Kamar',
     'f.dept':      'Dept',
-    'f.factory':   'Pabrik',
     'f.hp':        'HP',
     'f.email':     'Email',
     'f.bagasi':    'Bagasi',
@@ -68,25 +68,28 @@ const I18N = {
     'f.sopir':     'Sopir',
     'f.hpSopir':   'HP sopir',
 
-    'err.network':  'Koneksi bermasalah. Silakan coba lagi.',
-    'err.timeout':  'Server lambat merespons. Silakan coba lagi.',
-    'err.retrying': 'Koneksi lambat, mencoba lagi…',
-    'err.server':   'Sistem bermasalah. Silakan coba lagi nanti.',
-    'err.emailReq': 'Silakan masukkan email.',
-    'err.dateReq':  'Silakan pilih tanggal.',
-    'err.flightReq':'Silakan masukkan nomor penerbangan.',
+    'err.network':    'Koneksi bermasalah. Silakan coba lagi.',
+    'err.timeout':    'Server lambat merespons. Silakan coba lagi.',
+    'err.retrying':   'Koneksi lambat, mencoba lagi…',
+    'err.server':     'Sistem bermasalah. Silakan coba lagi nanti.',
+    'err.emailReq':   'Silakan masukkan email.',
+    'err.emailShort': 'Ketik minimal {n} huruf.',
+    'err.dateReq':    'Silakan pilih tanggal.',
+    'err.dateInvalid':'Tanggal tidak valid.',
+    'err.flightReq':  'Silakan masukkan NO Pesawat.',
 
-    'nav.back':  '← Kembali',
-    'foot.by':   'Dikelola oleh',
+    'nav.home':   'Beranda',
+    'foot.by':    'Dikelola oleh',
+    'foot.ext':   'Ext',
+    'foot.admin': 'Login Admin',
   },
 
   zh: {
     'app.name':        '機場接送系統',
-    'app.subtitle':    'PCI adidas',
 
     'home.query.title': '查詢我的行程',
     'home.query.desc':  '輸入電子郵件，查看自己的接送安排',
-    'home.list.title':  '依日期／航班號查詢',
+    'home.list.title':  '依航班日期／航班號查詢',
     'home.list.desc':   '看看同一天或同班機還有誰',
 
     'query.title':     '查詢接送',
@@ -95,19 +98,19 @@ const I18N = {
     'query.tab.flight':'航班號',
 
     'query.email.label': '電子郵件',
-    'query.email.hint':  '名冊上登記的信箱。共用同一個信箱的家屬會一起顯示。',
+    'query.email.hint':  '不用打完整——打一部分就好（至少 3 個字）。共用同一個信箱的家屬會一起顯示。',
     'query.date.label':  '航班日期',
     'query.date.hint':   '顯示當天所有人的接送安排。',
-    'query.flight.label':'航班號碼',
+    'query.flight.label':'航班號',
     'query.flight.hint': '例如 CI761、CX798。顯示同班機所有人。',
     'query.submit':      '查詢',
     'query.searching':   '查詢中…',
 
     'result.title':    '查詢結果',
     'result.count':    '{n} 筆',
-    'result.empty':    '查不到符合的資料。',
-    'result.emailHint':'請確認信箱是否正確，或洽總務。',
-    'result.range':    '只顯示最近 3 個月以及未來的資料。',
+    'result.empty':    '沒有即將到來的行程。',
+    'result.emailHint':'換個關鍵字試試，或洽總務。',
+    'result.range':    '只顯示今天以後的行程，已經過去的不會出現。',
 
     'arah.PICKUP':  '接機',
     'arah.DROPOFF': '送機',
@@ -118,7 +121,6 @@ const I18N = {
     'status.PENDING':   '待定',
     'status.CANCELLED': '已取消',
 
-    'f.date':      '航班日期',
     'f.pending':   '日期待定，請洽總務',
     'f.asal':      '原訂',
     'f.flight':    '航班號',
@@ -127,7 +129,6 @@ const I18N = {
     'f.titik':     '上車地點',
     'f.dorm':      '房間號碼',
     'f.dept':      '部門',
-    'f.factory':   '廠別',
     'f.hp':        '手機',
     'f.email':     '電子郵件',
     'f.bagasi':    '行李',
@@ -137,16 +138,20 @@ const I18N = {
     'f.sopir':     '司機',
     'f.hpSopir':   '司機電話',
 
-    'err.network':  '連線有問題，請再試一次。',
-    'err.timeout':  '伺服器回應太慢，請再試一次。',
-    'err.retrying': '連線比較慢，重試中…',
-    'err.server':   '系統出了問題，請稍後再試。',
-    'err.emailReq': '請輸入電子郵件。',
-    'err.dateReq':  '請選擇日期。',
-    'err.flightReq':'請輸入航班號。',
+    'err.network':    '連線有問題，請再試一次。',
+    'err.timeout':    '伺服器回應太慢，請再試一次。',
+    'err.retrying':   '連線比較慢，重試中…',
+    'err.server':     '系統出了問題，請稍後再試。',
+    'err.emailReq':   '請輸入電子郵件。',
+    'err.emailShort': '請至少輸入 {n} 個字。',
+    'err.dateReq':    '請選擇日期。',
+    'err.dateInvalid':'日期格式不正確。',
+    'err.flightReq':  '請輸入航班號。',
 
-    'nav.back':  '← 返回',
-    'foot.by':   '維護單位',
+    'nav.home':   '回首頁',
+    'foot.by':    '維護單位',
+    'foot.ext':   '分機',
+    'foot.admin': '管理者登入',
   },
 };
 
@@ -182,6 +187,25 @@ function t(key, vars) {
   return s;
 }
 
+/**
+ * 冒號要跟著語言走。
+ * 中文用全形「：」，印尼文用半形「: 」——
+ * 在印尼文句子裡放一個全形冒號會很突兀（Dikelola oleh：PCI GA），
+ * 而且那個字元在某些字型下寬度會怪怪的。
+ */
+function colon() { return currentLang === 'zh' ? '：' : ': '; }
+
+/** 後端回來的錯誤代碼 → 使用者看得懂的話 */
+function tError(code, detail) {
+  switch (code) {
+    case 'EMAIL_REQUIRED':  return t('err.emailReq');
+    case 'EMAIL_TOO_SHORT': return t('err.emailShort', { n: detail || 3 });
+    case 'DATE_INVALID':    return t('err.dateInvalid');
+    case 'FLIGHT_REQUIRED': return t('err.flightReq');
+    default:                return t('err.server');
+  }
+}
+
 /** 把畫面上所有 data-i18n 的元素填好，並更新語言按鈕與 <html lang> */
 function applyLang() {
   document.documentElement.lang = (currentLang === 'zh' ? 'zh-Hant' : 'id');
@@ -197,7 +221,28 @@ function applyLang() {
     btn.setAttribute('aria-pressed', String(btn.dataset.lang === currentLang));
   });
 
+  renderFooter();
   if (typeof onLangChanged === 'function') onLangChanged();
+}
+
+/**
+ * 頁尾：維護單位 → 聯絡分機 → 系統版本 → 管理者登入。
+ * 留空的欄位不會顯示（例如還沒填分機時就不會出現「分機：」）。
+ */
+function renderFooter() {
+  const box = document.getElementById('footInfo');
+  if (!box) return;
+
+  const parts = [];
+  const by = (SYSTEM_INFO.maintainer && SYSTEM_INFO.maintainer[currentLang]) || '';
+  if (by) parts.push(t('foot.by') + colon() + by);
+  if (SYSTEM_INFO.contact) parts.push(t('foot.ext') + ' ' + SYSTEM_INFO.contact);
+  parts.push('v' + SYSTEM_INFO.version);      // 'v' 只在顯示時加，存的是純數字
+
+  box.textContent = parts.join(' · ');
+
+  const admin = document.getElementById('footAdmin');
+  if (admin) admin.textContent = t('foot.admin');
 }
 
 /** 語言切換按鈕。每一頁都會呼叫。 */

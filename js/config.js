@@ -19,9 +19,16 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwMuEjod-AKyW6FZxevHD_G
  *    「複製一份」必然會走鐘，所以改版時兩邊都要記得改。
  */
 const SYSTEM_INFO = {
-  version: 'v0.1',
+  // ⚠️ 不要加 'v' 前綴。這個值必須跟 gas/Config.js 的 SYSTEM_INFO.version
+  //    以及所有 HTML 的 ?v= **完全相同**，tools/check.js 會比對。
+  //    顯示時才在前面加 v（見 js/i18n.js 的 renderFooter）。
+  version: '0.3',
   year: '2026',
+
+  // 維護單位（依介面語言顯示對應版本）
   maintainer: { zh: 'PCI 總務', id: 'PCI GA' },
+
+  // 聯絡分機。⚠️ 留空的話頁尾就不會出現這一段——填上實際分機號碼即可
   contact: '',
 };
 

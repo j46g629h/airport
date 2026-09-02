@@ -11,37 +11,60 @@
  * 1. **不遮蔽個資。** 這是使用者明確的決定：知道當天同班機有誰、幾點出發、
  *    能不能一起搭車，是實際需求。補強措施是前端加 noindex 讓 Google 搜不到。
  *
- * 2. **只看得到近 3 個月**（航班日期 >= 今天往前推 3 個月）。未來的不設限。
- *    管理者端沒有這個限制。這同時也是一層保護：就算網址外流，
- *    也只翻得到最近三個月，不是整個歷史。
+ * 2. **只看得到今天（含）以後的行程。** 過去的一律不顯示。
+ *
+ *    ⚠️ 判斷依據是**航班日期**，不是 STATUS。
+ *       用「狀態不是已完成」當條件的話，只要有人忘記把上個月那筆改成
+ *       「已完成」，它就會一直掛在使用者的清單上——而狀態是人手動維護的，
+ *       這種漏掉一定會發生。日期不會漏。
+ *
+ *    管理者端沒有這個限制，看得到全部歷史。
+ *    這同時也是一層保護：就算網址外流，也翻不到任何過去的紀錄。
  *
  * 3. **「待定」的行程不顯示原本的日期。** 只回傳「日期待定」。
  *    顯示舊日期的話，使用者會照那個日期去等車——那比看不到更糟。
+ *
+ *    已取消、已改期的**未來**行程仍然會顯示（帶狀態徽章）。
+ *    藏起來的話，被取消的人會照原訂時間去機場。
  */
 
-var USER_MONTHS_BACK = 3;
+/** email 至少要打幾個字才查。太短的話等於把整份名單倒出來。 */
+var EMAIL_MIN_CHARS = 3;
 
 
 /* ══════════════════════════════════════════════════════════════
    對外的三支
    ══════════════════════════════════════════════════════════════ */
 
+/**
+ * 用 email 查，**部分符合就算**（不必打完整的信箱）。
+ *
+ * 手機上打完整信箱很痛苦，打 `kyle` 或 `kyle.ma` 就找得到才實用。
+ * ⚠️ 但要有最低字數：打一個 `a` 會把幾乎整份名單倒出來，
+ *    那就不是「查詢」而是「匯出全部」了。
+ */
 function queryByEmail(params) {
-  var email = String(params.email || '').trim().toLowerCase();
-  if (!email) return fail_('BAD_INPUT', '請輸入電子郵件');
-  if (email.indexOf('@') < 0) return fail_('BAD_INPUT', '電子郵件格式不正確');
+  var q = String(params.email || '').trim().toLowerCase();
+  if (!q) return fail_('BAD_INPUT', 'EMAIL_REQUIRED');
+  if (q.length < EMAIL_MIN_CHARS) return fail_('EMAIL_TOO_SHORT', String(EMAIL_MIN_CHARS));
 
   var items = filterForUser_(readIndex_(), function (r) {
-    return r.email === email || r.email_kontak === email;
+    return String(r.email).indexOf(q) >= 0 || String(r.email_kontak).indexOf(q) >= 0;
   });
-  return ok_({ mode: 'email', keyword: email, items: items, total: items.length });
+  return ok_({ mode: 'email', keyword: q, items: items, total: items.length });
 }
 
 
+/**
+ * ⚠️ 錯誤訊息回「代碼」，不回中文句子。
+ *    後端不知道使用者現在把介面切成印尼文還是中文，
+ *    回中文句子的話，印尼籍使用者會突然看到一句他看不懂的話。
+ *    翻譯是前端的事（js/i18n.js）。
+ */
 function queryByDate(params) {
   var raw = String(params.date || '').trim();
   var d = parseDMY_(raw) || parseIsoDate_(raw);
-  if (!d) return fail_('BAD_INPUT', '日期格式請用 dd/mm/yyyy，例如 18/09/2026');
+  if (!d) return fail_('BAD_INPUT', 'DATE_INVALID');
 
   var iso = isoDate_(d);
   var items = filterForUser_(readIndex_(), function (r) { return r.tanggal_iso === iso; });
@@ -52,7 +75,7 @@ function queryByDate(params) {
 function queryByFlight(params) {
   // 使用者打字時很容易多打空格或用小寫，這裡跟寫入時用同一套正規化
   var code = String(params.flight || '').replace(/\s+/g, '').toUpperCase();
-  if (!code) return fail_('BAD_INPUT', '請輸入航班號');
+  if (!code) return fail_('BAD_INPUT', 'FLIGHT_REQUIRED');
 
   var items = filterForUser_(readIndex_(), function (r) {
     return String(r.flight).replace(/\s+/g, '').toUpperCase() === code;
@@ -65,17 +88,21 @@ function queryByFlight(params) {
    共用
    ══════════════════════════════════════════════════════════════ */
 
-/** 套用「近 3 個月」規則，再轉成前端要的格式 */
+/**
+ * 套用「今天（含）以後」規則，再轉成前端要的格式。
+ * 排序在 _INDEX 建立時就做好了（日期由新到舊），這裡反轉成由近到遠——
+ * 使用者最關心的是「下一趟是什麼時候」，那應該排在最上面。
+ */
 function filterForUser_(index, match) {
-  var cutoff = isoDate_(monthsAgo_(USER_MONTHS_BACK));
+  var todayIso = isoDate_(today_());
   var out = [];
   for (var i = 0; i < index.length; i++) {
     var r = index[i];
-    if (r.tanggal_iso < cutoff) continue;
+    if (r.tanggal_iso < todayIso) continue;      // 過去的一律不給使用者看
     if (!match(r)) continue;
     out.push(toPublicItem_(r));
   }
-  return out;
+  return out.reverse();
 }
 
 

@@ -3,14 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- ⚠️ 網站本身是公開的（GitHub Pro 只保護原始碼，不保護網站），
+<!-- ⚠️ 網站是公開的（免費方案的 Pages 只支援公開 repo），
      所以至少不要讓它被搜尋引擎收錄。知道網址的人才進得來。 -->
 <meta name="robots" content="noindex, nofollow">
 <title>Antar Jemput Bandara — PCI adidas</title>
-<!-- ⚠️ 改了 CSS 或 JS 一定要把 ?v= 往上加，兩個 HTML 檔要一起改。
-     GitHub Pages 會讓瀏覽器把資源快取 10 分鐘，漏改的話後端已經更新
-     而前端還是舊的，畫面會用「錯誤的方式」壞掉。 -->
-<link rel="stylesheet" href="css/style.css?v=0.1">
+<!-- ⚠️ 改了 CSS 或 JS 一定要把 ?v= 往上加，query.html、admin.html 也要一起改 -->
+<link rel="stylesheet" href="css/style.css?v=0.3">
 </head>
 <body>
 
@@ -30,28 +28,21 @@
   </a>
 
   <a class="entry" href="query.html?mode=date">
-    <div class="entry-title" data-i18n="home.list.title">Cari per Tanggal / Nomor Penerbangan</div>
+    <div class="entry-title" data-i18n="home.list.title">Cari per Tanggal / NO Pesawat</div>
     <div class="entry-desc" data-i18n="home.list.desc">Lihat siapa saja yang berangkat pada hari atau penerbangan yang sama</div>
   </a>
 
   <footer class="foot">
-    <span id="footInfo"></span>
+    <div id="footInfo"></div>
+    <a class="foot-admin" id="footAdmin" href="admin.html">Login Admin</a>
   </footer>
 
 </main>
 
-<script src="js/config.js?v=0.1"></script>
-<script src="js/i18n.js?v=0.1"></script>
+<script src="js/config.js?v=0.3"></script>
+<script src="js/i18n.js?v=0.3"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    initLangSwitch();
-  });
-  // 語言切換後重畫頁尾（i18n.js 會呼叫這一支）
-  function onLangChanged() {
-    var by = SYSTEM_INFO.maintainer[getLang()] || '';
-    document.getElementById('footInfo').textContent =
-      (by ? t('foot.by') + '：' + by + '　' : '') + SYSTEM_INFO.version;
-  }
+  document.addEventListener('DOMContentLoaded', initLangSwitch);
 </script>
 
 </body>

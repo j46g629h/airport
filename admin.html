@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Login Admin — Antar Jemput Bandara</title>
+<link rel="stylesheet" href="css/style.css?v=0.3">
+</head>
+<body>
+
+<!--
+  ⚠️ 這是**佔位頁**，階段 2 會換成真正的管理者登入。
+
+  為什麼現在就要有這一頁：頁尾已經放了「管理者登入」連結，
+  沒有這個檔案的話那個連結會 404。壞掉的連結會讓人以為整個系統壞了，
+  而做一頁「開發中」的成本只有這幾行。
+-->
+
+<header class="topbar">
+  <a class="backbtn" href="index.html">
+    <span aria-hidden="true">←</span>
+    <span data-i18n="nav.home">Beranda</span>
+  </a>
+  <span class="brand" data-i18n="app.name">Antar Jemput Bandara</span>
+  <nav class="lang" aria-label="Language">
+    <button type="button" data-lang="id" aria-pressed="true">ID</button>
+    <button type="button" data-lang="zh" aria-pressed="false">中</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <div class="card">
+    <h1 id="soonTitle">Login Admin</h1>
+    <p id="soonText"></p>
+  </div>
+
+  <footer class="foot">
+    <div id="footInfo"></div>
+  </footer>
+</main>
+
+<script src="js/config.js?v=0.3"></script>
+<script src="js/i18n.js?v=0.3"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', initLangSwitch);
+
+  function onLangChanged() {
+    var zh = (getLang() === 'zh');
+    document.getElementById('soonTitle').textContent = zh ? '管理者登入' : 'Login Admin';
+    document.getElementById('soonText').textContent = zh
+      ? '管理功能開發中，預計下一階段開放。目前請直接在 Google 試算表上維護資料。'
+      : 'Fitur admin sedang dikembangkan. Untuk sementara, silakan kelola data langsung di Google Sheet.';
+  }
+</script>
+
+</body>
+</html>

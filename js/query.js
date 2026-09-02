@@ -35,6 +35,11 @@ document.addEventListener('DOMContentLoaded', function () {
     doSearch();
   });
 
+  // 日期欄位的確認文字
+  const dateInput = document.getElementById('inputDate');
+  dateInput.addEventListener('change', showPickedDate);
+  dateInput.addEventListener('input', showPickedDate);
+
   // 上次查詢成功的信箱先填好，省得每次重打
   try {
     const last = localStorage.getItem(LS_EMAIL);
@@ -50,6 +55,25 @@ document.addEventListener('DOMContentLoaded', function () {
 /** 語言切換後由 i18n.js 呼叫：把已經查到的結果用新語言重畫 */
 function onLangChanged() {
   if (lastResult) renderResult(lastResult);
+}
+
+
+/**
+ * 日期欄位下方的確認文字。
+ *
+ * ⚠️ <input type="date"> 的**顯示格式跟著看的人那台裝置的地區設定走**，
+ *    HTML 和 CSS 都改不了：印尼的手機顯示 18/09/2026，美式設定的電腦顯示 09/18/2026。
+ *    但送出去的值永遠是 YYYY-MM-DD（HTML 規格規定），所以查詢結果一定是對的，
+ *    差別純粹在畫面上。
+ *
+ *    這一行由我們自己控制，一定是 dd/mm/yyyy——使用者就算看到輸入框上是
+ *    美式順序，也能對照這一行確認自己選對了日子。
+ */
+function showPickedDate() {
+  const el = document.getElementById('pickedDate');
+  const v = document.getElementById('inputDate').value;      // 一律是 YYYY-MM-DD
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  el.textContent = m ? ('→ ' + m[3] + '/' + m[2] + '/' + m[1]) : '';
 }
 
 
@@ -70,10 +94,14 @@ function switchMode(mode) {
 async function doSearch() {
   const btn = document.getElementById('submitBtn');
 
+  const EMAIL_MIN = 3;      // ⚠️ 要跟 gas/Query.js 的 EMAIL_MIN_CHARS 一致
+
   let promise, keyword;
   if (currentMode === 'email') {
     keyword = document.getElementById('inputEmail').value.trim();
     if (!keyword) return showError(t('err.emailReq'));
+    // 前端先擋一次，省掉一趟 3~8 秒的 API。後端也會擋（前端擋不住惡意呼叫）
+    if (keyword.length < EMAIL_MIN) return showError(t('err.emailShort', { n: EMAIL_MIN }));
     promise = Api.queryByEmail(keyword);
   } else if (currentMode === 'date') {
     keyword = document.getElementById('inputDate').value.trim();
@@ -92,7 +120,8 @@ async function doSearch() {
   try {
     const res = await promise;
     if (!res || !res.ok) {
-      showError((res && res.message) || t('err.server'));
+      // 後端回的是代碼不是句子，翻譯在這裡做（見 js/i18n.js 的 tError）
+      showError(tError(res && res.error, res && res.message));
       return;
     }
     lastResult = res.data;
@@ -213,8 +242,8 @@ function bookingCard(it) {
   if (vrows.length) vehicle = '<div class="booking-vehicle"><dl class="kv">' + vrows.join('') + '</dl></div>';
 
   let notes = '';
-  if (it.remark)     notes += '<div class="booking-note">' + esc(t('f.remark')) + '：' + esc(it.remark) + '</div>';
-  if (it.permintaan) notes += '<div class="booking-note">' + esc(t('f.permintaan')) + '：' + esc(it.permintaan) + '</div>';
+  if (it.remark)     notes += '<div class="booking-note">' + esc(t('f.remark')) + esc(colon()) + esc(it.remark) + '</div>';
+  if (it.permintaan) notes += '<div class="booking-note">' + esc(t('f.permintaan')) + esc(colon()) + esc(it.permintaan) + '</div>';
 
   return '<article class="' + cls.join(' ') + '">' + head + name +
          (rows.length ? '<dl class="kv">' + rows.join('') + '</dl>' : '') +

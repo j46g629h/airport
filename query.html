@@ -5,13 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Cek Jadwal — Antar Jemput Bandara</title>
-<!-- ⚠️ 改了 CSS 或 JS 一定要把 ?v= 往上加，index.html 也要一起改 -->
-<link rel="stylesheet" href="css/style.css?v=0.1">
+<!-- ⚠️ 改了 CSS 或 JS 一定要把 ?v= 往上加，index.html、admin.html 都要一起改，
+     而且 js/config.js 的 SYSTEM_INFO.version 與 gas/Config.js 也要同步。
+     GitHub Pages 會讓瀏覽器把資源快取 10 分鐘，漏改的話後端已經更新
+     而前端還是舊的，畫面會用「錯誤的方式」壞掉。 -->
+<link rel="stylesheet" href="css/style.css?v=0.3">
 </head>
 <body>
 
 <header class="topbar">
-  <a class="brand" href="index.html" data-i18n="app.name">Antar Jemput Bandara</a>
+  <!-- 返回鍵放最左上角，做成有邊框的按鈕而不是純文字連結：
+       純文字在手機上又小又不像可以點，使用者會找不到出口 -->
+  <a class="backbtn" href="index.html">
+    <span aria-hidden="true">←</span>
+    <span data-i18n="nav.home">Beranda</span>
+  </a>
+  <span class="brand" data-i18n="app.name">Antar Jemput Bandara</span>
   <nav class="lang" aria-label="Language">
     <button type="button" data-lang="id" aria-pressed="true">ID</button>
     <button type="button" data-lang="zh" aria-pressed="false">中</button>
@@ -26,25 +35,28 @@
 
     <div class="tabs" role="group">
       <button type="button" data-mode="email"  aria-pressed="true"  data-i18n="query.tab.email">Email</button>
-      <button type="button" data-mode="date"   aria-pressed="false" data-i18n="query.tab.date">Tanggal</button>
-      <button type="button" data-mode="flight" aria-pressed="false" data-i18n="query.tab.flight">Penerbangan</button>
+      <button type="button" data-mode="date"   aria-pressed="false" data-i18n="query.tab.date">Tanggal Pesawat</button>
+      <button type="button" data-mode="flight" aria-pressed="false" data-i18n="query.tab.flight">NO Pesawat</button>
     </div>
 
     <div class="field" id="field-email">
       <label for="inputEmail" data-i18n="query.email.label">Alamat email</label>
-      <input type="email" id="inputEmail" autocomplete="email" inputmode="email"
-             placeholder="nama@pouchen.com">
+      <input type="text" id="inputEmail" autocomplete="email" inputmode="email"
+             autocapitalize="off" spellcheck="false" placeholder="kyle.ma">
       <div class="hint" data-i18n="query.email.hint"></div>
     </div>
 
     <div class="field" id="field-date" hidden>
-      <label for="inputDate" data-i18n="query.date.label">Tanggal penerbangan</label>
+      <label for="inputDate" data-i18n="query.date.label">Tanggal Pesawat</label>
       <input type="date" id="inputDate">
+      <!-- ⚠️ 輸入框本身的顯示順序跟著裝置地區設定走，管不了。
+           這一行由我們控制，一定是 dd/mm/yyyy（見 js/query.js 的 showPickedDate） -->
+      <div class="picked" id="pickedDate" aria-live="polite"></div>
       <div class="hint" data-i18n="query.date.hint"></div>
     </div>
 
     <div class="field" id="field-flight" hidden>
-      <label for="inputFlight" data-i18n="query.flight.label">Nomor penerbangan</label>
+      <label for="inputFlight" data-i18n="query.flight.label">NO Pesawat</label>
       <input type="text" id="inputFlight" autocapitalize="characters" spellcheck="false"
              placeholder="CI761">
       <div class="hint" data-i18n="query.flight.hint"></div>
@@ -56,27 +68,16 @@
   <div id="result" aria-live="polite"></div>
 
   <footer class="foot">
-    <p><a href="index.html" data-i18n="nav.back">← Kembali</a></p>
-    <span id="footInfo"></span>
+    <div id="footInfo"></div>
+    <a class="foot-admin" id="footAdmin" href="admin.html">Login Admin</a>
   </footer>
 
 </main>
 
-<script src="js/config.js?v=0.1"></script>
-<script src="js/i18n.js?v=0.1"></script>
-<script src="js/api.js?v=0.1"></script>
-<script src="js/query.js?v=0.1"></script>
-<script>
-  // query.js 已經定義了 onLangChanged 來重畫結果，
-  // 這裡把頁尾接上去（包一層，兩件事都要做）
-  var _origOnLangChanged = onLangChanged;
-  onLangChanged = function () {
-    if (_origOnLangChanged) _origOnLangChanged();
-    var by = SYSTEM_INFO.maintainer[getLang()] || '';
-    document.getElementById('footInfo').textContent =
-      (by ? t('foot.by') + '：' + by + '　' : '') + SYSTEM_INFO.version;
-  };
-</script>
+<script src="js/config.js?v=0.3"></script>
+<script src="js/i18n.js?v=0.3"></script>
+<script src="js/api.js?v=0.3"></script>
+<script src="js/query.js?v=0.3"></script>
 
 </body>
 </html>
