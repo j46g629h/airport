@@ -78,10 +78,11 @@ const I18N = {
     'err.dateInvalid':'Tanggal tidak valid.',
     'err.flightReq':  'Silakan masukkan NO Pesawat.',
 
-    'nav.home':   'Beranda',
-    'foot.by':    'Dikelola oleh',
-    'foot.ext':   'Ext',
-    'foot.admin': 'Login Admin',
+    'nav.home':     'Beranda',
+    'foot.by':      'Dikelola oleh',
+    'foot.ext':     'Ext',
+    'foot.version': 'Versi Sistem',
+    'foot.admin':   'Login Admin',
   },
 
   zh: {
@@ -148,10 +149,11 @@ const I18N = {
     'err.dateInvalid':'日期格式不正確。',
     'err.flightReq':  '請輸入航班號。',
 
-    'nav.home':   '回首頁',
-    'foot.by':    '維護單位',
-    'foot.ext':   '分機',
-    'foot.admin': '管理者登入',
+    'nav.home':     '回首頁',
+    'foot.by':      '維護單位',
+    'foot.ext':     '分機',
+    'foot.version': '系統版本',
+    'foot.admin':   '管理者登入',
   },
 };
 
@@ -237,7 +239,9 @@ function renderFooter() {
   const by = (SYSTEM_INFO.maintainer && SYSTEM_INFO.maintainer[currentLang]) || '';
   if (by) parts.push(t('foot.by') + colon() + by);
   if (SYSTEM_INFO.contact) parts.push(t('foot.ext') + ' ' + SYSTEM_INFO.contact);
-  parts.push('v' + SYSTEM_INFO.version);      // 'v' 只在顯示時加，存的是純數字
+  // 'v' 與「系統版本」這幾個字只在顯示時加，存的是純數字（見 js/config.js）
+  parts.push(t('foot.version') + ' v' + SYSTEM_INFO.version);
+  if (SYSTEM_INFO.year) parts.push(SYSTEM_INFO.year);
 
   box.textContent = parts.join(' · ');
 
