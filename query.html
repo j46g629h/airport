@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cek Jadwal — Antar Jemput Bandara</title>
+<!-- ⚠️ 改了 CSS 或 JS 一定要把 ?v= 往上加，index.html 也要一起改 -->
+<link rel="stylesheet" href="css/style.css?v=0.1">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html" data-i18n="app.name">Antar Jemput Bandara</a>
+  <nav class="lang" aria-label="Language">
+    <button type="button" data-lang="id" aria-pressed="true">ID</button>
+    <button type="button" data-lang="zh" aria-pressed="false">中</button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <h1 data-i18n="query.title">Cek Jadwal</h1>
+
+  <form id="searchForm" class="card card--lift">
+
+    <div class="tabs" role="group">
+      <button type="button" data-mode="email"  aria-pressed="true"  data-i18n="query.tab.email">Email</button>
+      <button type="button" data-mode="date"   aria-pressed="false" data-i18n="query.tab.date">Tanggal</button>
+      <button type="button" data-mode="flight" aria-pressed="false" data-i18n="query.tab.flight">Penerbangan</button>
+    </div>
+
+    <div class="field" id="field-email">
+      <label for="inputEmail" data-i18n="query.email.label">Alamat email</label>
+      <input type="email" id="inputEmail" autocomplete="email" inputmode="email"
+             placeholder="nama@pouchen.com">
+      <div class="hint" data-i18n="query.email.hint"></div>
+    </div>
+
+    <div class="field" id="field-date" hidden>
+      <label for="inputDate" data-i18n="query.date.label">Tanggal penerbangan</label>
+      <input type="date" id="inputDate">
+      <div class="hint" data-i18n="query.date.hint"></div>
+    </div>
+
+    <div class="field" id="field-flight" hidden>
+      <label for="inputFlight" data-i18n="query.flight.label">Nomor penerbangan</label>
+      <input type="text" id="inputFlight" autocapitalize="characters" spellcheck="false"
+             placeholder="CI761">
+      <div class="hint" data-i18n="query.flight.hint"></div>
+    </div>
+
+    <button type="submit" class="btn" id="submitBtn" data-i18n="query.submit">Cari</button>
+  </form>
+
+  <div id="result" aria-live="polite"></div>
+
+  <footer class="foot">
+    <p><a href="index.html" data-i18n="nav.back">← Kembali</a></p>
+    <span id="footInfo"></span>
+  </footer>
+
+</main>
+
+<script src="js/config.js?v=0.1"></script>
+<script src="js/i18n.js?v=0.1"></script>
+<script src="js/api.js?v=0.1"></script>
+<script src="js/query.js?v=0.1"></script>
+<script>
+  // query.js 已經定義了 onLangChanged 來重畫結果，
+  // 這裡把頁尾接上去（包一層，兩件事都要做）
+  var _origOnLangChanged = onLangChanged;
+  onLangChanged = function () {
+    if (_origOnLangChanged) _origOnLangChanged();
+    var by = SYSTEM_INFO.maintainer[getLang()] || '';
+    document.getElementById('footInfo').textContent =
+      (by ? t('foot.by') + '：' + by + '　' : '') + SYSTEM_INFO.version;
+  };
+</script>
+
+</body>
+</html>

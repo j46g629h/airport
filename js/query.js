@@ -1,0 +1,236 @@
+/**
+ * query.js — 查詢頁
+ *
+ * 三種查法共用同一個結果區：email / 航班日期 / 航班號。
+ *
+ * ⚠️ 渲染函式一律包 try/catch、讀 API 回傳值一律防禦性存取（item.remark || ''）。
+ *    前後端版本不一致時（使用者的瀏覽器快取了舊的 JS），
+ *    這樣最多只是少顯示一段，不會整頁空白又沒有任何訊息——
+ *    「畫面全白」是最難查的一種故障，因為主控台以外看不到任何線索。
+ */
+
+let currentMode = 'email';
+let lastResult = null;      // 語言切換時要用原資料重畫，不必重打 API
+
+
+/* ══════════════════ 初始化 ══════════════════ */
+
+document.addEventListener('DOMContentLoaded', function () {
+  initLangSwitch();
+
+  // 連線層要重試時，把載入文字換掉。
+  // 少了這行，使用者看到骨架卡住不動 25 秒，會以為當掉而重新整理——
+  // 那反而讓他從頭再等一次。
+  setApiRetryNotice(function () {
+    const note = document.getElementById('loadingNote');
+    if (note) note.textContent = t('err.retrying');
+  });
+
+  document.querySelectorAll('.tabs button').forEach(function (btn) {
+    btn.addEventListener('click', function () { switchMode(btn.dataset.mode); });
+  });
+
+  document.getElementById('searchForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    doSearch();
+  });
+
+  // 上次查詢成功的信箱先填好，省得每次重打
+  try {
+    const last = localStorage.getItem(LS_EMAIL);
+    if (last) document.getElementById('inputEmail').value = last;
+  } catch (e) { /* 讀不到就空白，不影響功能 */ }
+
+  // 網址帶 ?mode=date 之類的話直接切過去（首頁的第二個入口會用）
+  const m = new URLSearchParams(location.search).get('mode');
+  switchMode(m === 'date' || m === 'flight' ? m : 'email');
+});
+
+
+/** 語言切換後由 i18n.js 呼叫：把已經查到的結果用新語言重畫 */
+function onLangChanged() {
+  if (lastResult) renderResult(lastResult);
+}
+
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.tabs button').forEach(function (btn) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode));
+  });
+  ['email', 'date', 'flight'].forEach(function (m) {
+    document.getElementById('field-' + m).hidden = (m !== mode);
+  });
+  clearResult();
+}
+
+
+/* ══════════════════ 查詢 ══════════════════ */
+
+async function doSearch() {
+  const btn = document.getElementById('submitBtn');
+
+  let promise, keyword;
+  if (currentMode === 'email') {
+    keyword = document.getElementById('inputEmail').value.trim();
+    if (!keyword) return showError(t('err.emailReq'));
+    promise = Api.queryByEmail(keyword);
+  } else if (currentMode === 'date') {
+    keyword = document.getElementById('inputDate').value.trim();
+    if (!keyword) return showError(t('err.dateReq'));
+    promise = Api.queryByDate(keyword);          // <input type="date"> 送出 YYYY-MM-DD，後端兩種都吃
+  } else {
+    keyword = document.getElementById('inputFlight').value.trim();
+    if (!keyword) return showError(t('err.flightReq'));
+    promise = Api.queryByFlight(keyword);
+  }
+
+  btn.disabled = true;
+  btn.textContent = t('query.searching');
+  showSkeleton();
+
+  try {
+    const res = await promise;
+    if (!res || !res.ok) {
+      showError((res && res.message) || t('err.server'));
+      return;
+    }
+    lastResult = res.data;
+    renderResult(res.data);
+
+    // ⚠️ 只存「查得到資料」的那一次，而且只留一筆。
+    //    存了查無資料的，等資料補上之後他還要看到舊的空白結果；
+    //    留多筆的話，借手機給同事用會把別人的信箱累積在這台裝置上。
+    if (currentMode === 'email' && res.data.total > 0) {
+      try { localStorage.setItem(LS_EMAIL, keyword); } catch (e) { /* 存不進去只是下次要重打 */ }
+    }
+  } catch (err) {
+    if (err && err.name === 'ApiConnectionError') {
+      showError(err.message === 'TIMEOUT' ? t('err.timeout') : t('err.network'));
+    } else {
+      showError(t('err.server'));
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('query.submit');
+  }
+}
+
+
+/* ══════════════════ 畫面 ══════════════════ */
+
+function resultBox() { return document.getElementById('result'); }
+
+function clearResult() {
+  lastResult = null;
+  resultBox().innerHTML = '';
+}
+
+function showSkeleton() {
+  resultBox().innerHTML =
+    '<div class="skeleton"><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>' +
+    '<p class="loading-note" id="loadingNote">' + esc(t('query.searching')) + '</p>';
+}
+
+function showError(msg) {
+  lastResult = null;
+  resultBox().innerHTML = '<div class="msg msg--error">' + esc(msg) + '</div>';
+}
+
+
+function renderResult(data) {
+  try {
+    const items = (data && data.items) || [];
+    const box = resultBox();
+
+    if (!items.length) {
+      box.innerHTML =
+        '<div class="msg msg--empty"><p>' + esc(t('result.empty')) + '</p>' +
+        (data.mode === 'email' ? '<p>' + esc(t('result.emailHint')) + '</p>' : '') +
+        '</div>';
+      return;
+    }
+
+    box.innerHTML =
+      '<div class="result-head"><h2>' + esc(t('result.title')) + '</h2>' +
+      '<span class="count">' + esc(t('result.count', { n: items.length })) + '</span></div>' +
+      items.map(bookingCard).join('') +
+      '<p class="loading-note">' + esc(t('result.range')) + '</p>';
+  } catch (err) {
+    // 這裡出錯只會少顯示結果，不要讓整頁變白
+    showError(t('err.server'));
+    if (window.console) console.error('renderResult 失敗', err);
+  }
+}
+
+
+function bookingCard(it) {
+  const arah = it.arah || '';
+  const status = it.status || 'SCHEDULED';
+  const isPending = (status === 'PENDING');
+
+  const cls = ['booking'];
+  cls.push(arah === 'PICKUP' ? 'booking--pickup' : 'booking--dropoff');
+  if (status === 'CANCELLED') cls.push('booking--cancelled');
+
+  // 標題列：日期 + 接/送 + 狀態徽章
+  let head = '<div class="booking-top">';
+  head += '<span class="booking-date">' +
+          esc(isPending ? t('f.pending') : (it.tanggal || '')) + '</span>';
+  head += '<span class="booking-arah ' + (arah === 'PICKUP' ? 'arah--pickup' : 'arah--dropoff') + '">' +
+          esc(t('arah.' + arah)) + '</span>';
+  if (status !== 'SCHEDULED') {
+    head += '<span class="badge badge--' + status.toLowerCase() + '">' +
+            esc(t('status.' + status)) + '</span>';
+  }
+  head += '</div>';
+
+  const name = '<div class="booking-name">' + esc(it.name || '') +
+               (it.nama_cina ? ' <span class="cn">' + esc(it.nama_cina) + '</span>' : '') +
+               '</div>';
+
+  // 欄位。空的一律不顯示——留一排「—」只是噪音
+  const rows = [];
+  if (status === 'POSTPONED' && it.tanggal_asal) row(rows, t('f.asal'), it.tanggal_asal);
+  if (it.pickup)       row(rows, t('f.pickup'), it.pickup, true);
+  else if (it.dari_pci) row(rows, t('f.pickup'), it.dari_pci, true);
+  if (it.titik_jemput) row(rows, t('f.titik'), it.titik_jemput);
+  if (it.flight)       row(rows, t('f.flight'), it.flight + (it.etd_eta ? '　' + it.etd_eta : ''));
+  else if (it.etd_eta) row(rows, t('f.etd'), it.etd_eta);
+  if (it.dorm)         row(rows, t('f.dorm'), it.dorm);
+  if (it.dept)         row(rows, t('f.dept'), it.dept);
+  if (it.hp)           row(rows, t('f.hp'), it.hp);
+  if (it.email)        row(rows, t('f.email'), it.email);
+  if (it.bagasi)       row(rows, t('f.bagasi'), it.bagasi);
+
+  // 派車：介面已經備好，只是目前資料是空的所以整塊不會出現。
+  // 日後管理者開始填車號，這一塊就自動長出來，前端不必再改。
+  let vehicle = '';
+  const vrows = [];
+  if (it.kendaraan) row(vrows, t('f.kendaraan'), it.kendaraan, true);
+  if (it.sopir)     row(vrows, t('f.sopir'), it.sopir);
+  if (it.hp_sopir)  row(vrows, t('f.hpSopir'), it.hp_sopir);
+  if (vrows.length) vehicle = '<div class="booking-vehicle"><dl class="kv">' + vrows.join('') + '</dl></div>';
+
+  let notes = '';
+  if (it.remark)     notes += '<div class="booking-note">' + esc(t('f.remark')) + '：' + esc(it.remark) + '</div>';
+  if (it.permintaan) notes += '<div class="booking-note">' + esc(t('f.permintaan')) + '：' + esc(it.permintaan) + '</div>';
+
+  return '<article class="' + cls.join(' ') + '">' + head + name +
+         (rows.length ? '<dl class="kv">' + rows.join('') + '</dl>' : '') +
+         vehicle + notes + '</article>';
+}
+
+
+function row(arr, label, value, big) {
+  arr.push('<dt>' + esc(label) + '</dt><dd' + (big ? ' class="big"' : '') + '>' + esc(value) + '</dd>');
+}
+
+
+/** ⚠️ 所有進到 innerHTML 的值都要過這一關。
+    姓名、備註是人打進 Sheet 的，裡面有 < 或 & 會把版面弄壞。 */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}

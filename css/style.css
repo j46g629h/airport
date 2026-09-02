@@ -1,0 +1,448 @@
+/* PCI 機場接送系統 — 樣式
+   設計原則：手機優先、大字體、大按鈕
+
+   ⚠️ 設計 token（下面 :root 那一區）沿用員工餐廳系統 KANTIN，
+      那些顏色都算過 WCAG 對比度，在工廠的光線下看得清楚。
+      要調整整體風格改那一區就好，不要在下面的規則裡寫死顏色。
+*/
+
+:root {
+  /* 只支援淺色。不宣告的話，部分 Android 瀏覽器會強制反轉整頁，
+     精心調的米白會變成深褐色，狀態色也會跟著跑掉 */
+  color-scheme: light;
+
+  /* --- 基本表面與文字 --- */
+  --bg:            #EFEFED;   /* 中性米白。不是白、也不是冷灰 */
+  --surface:       #F9F9F8;   /* 卡片，比底色亮一階 */
+  --surface-alt:   #E7E7E6;
+  --text:          #1A1A1D;   /* 對底色 15.1:1 */
+  --text-muted:    #53535A;   /* 對底色 6.6:1 */
+  --text-subtle:   #6A6A70;   /* 對底色 4.7:1，剛好通過 WCAG AA */
+  --border:        #DEDEDD;   /* 純裝飾的分隔線，沒有對比度要求 */
+  --border-strong: #CBCBCA;
+
+  /* ⚠️ 輸入框、可點按鈕的**邊界**是另一個顏色，不能用上面那兩個。
+     WCAG 1.4.11 要求互動元件的邊界對背景至少 3:1——
+     #CBCBCA 只有 1.41:1，在工廠光線下等於看不到輸入框在哪裡。 */
+  --border-input:  #80807A;   /* 對底色 3.45:1 */
+
+  /* --- 主要動作：近黑，不是彩色 --- */
+  --action:        #1A1A1C;
+  --action-press:  #35353A;
+
+  /* --- 狀態色：畫面上僅有的彩色，每個都算過對比度 --- */
+  --ok:            #046C4E;
+  --ok-bg:         #E7F5EE;
+  --ok-border:     #BFE3D3;
+  --danger:        #A81E1E;
+  --danger-bg:     #FBEDEC;
+  --danger-border: #F3CFCD;
+  --warn:          #8A5300;
+  --warn-bg:       #FBF2E3;
+  --warn-border:   #EBD9B4;
+  --info:          #1F4E8C;
+  --info-bg:       #E8F0FA;
+  --info-border:   #C4D8F0;
+
+  /* --- 圓角 --- */
+  --radius-sm:   10px;
+  --radius:      14px;
+  --radius-lg:   20px;
+  --radius-pill: 999px;
+
+  /* --- 字級 ---
+     clamp(最小, 隨螢幕寬度連續變化, 最大)：手機到電腦是平滑過渡。
+     ⚠️ --fs-input 的下限鎖死 16px。低於 16px 的話，iOS 一點輸入框
+        就會自動放大整個畫面，使用者要手動縮回來。 */
+  --fs-xs:      clamp(12px, 0.70rem + 0.15vw, 13px);
+  --fs-sm:      clamp(13px, 0.78rem + 0.20vw, 15px);
+  --fs-body:    clamp(15px, 0.88rem + 0.25vw, 17px);
+  --fs-input:   clamp(16px, 0.95rem + 0.20vw, 17px);
+  --fs-lg:      clamp(17px, 1.00rem + 0.40vw, 20px);
+  --fs-title:   clamp(23px, 1.30rem + 1.30vw, 34px);
+
+  /* --- 觸控目標最小高度（可能戴手套，不要小於 48px）--- */
+  --tap-min: 48px;
+
+  --gap:      clamp(12px, 0.70rem + 0.40vw, 18px);
+  --pad-card: clamp(16px, 0.90rem + 0.60vw, 24px);
+  --sec-gap:  clamp(28px, 1.50rem + 2.00vw, 56px);
+
+  /* --- 陰影：強度要跟重要性成正比，不要每張卡片都一樣 --- */
+  --lift-1: 0 1px 2px rgba(38,38,44,.05), 0 6px 14px -8px rgba(38,38,44,.16);
+  --lift-2: 0 10px 24px -10px rgba(40,40,45,.20), 0 24px 48px -24px rgba(40,40,45,.24);
+}
+
+
+/* ===== 基礎 ===== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--gap);
+}
+
+h1, h2, h3 { margin: 0 0 .4em; line-height: 1.25; }
+h1 { font-size: var(--fs-title); }
+h2 { font-size: var(--fs-lg); }
+
+a { color: var(--action); }
+
+/* 鍵盤操作時看得到焦點在哪 */
+:focus-visible {
+  outline: 3px solid var(--action);
+  outline-offset: 2px;
+}
+
+
+/* ===== 頁首 ===== */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: var(--gap);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar .brand {
+  font-weight: 700;
+  font-size: var(--fs-lg);
+  margin-right: auto;
+  text-decoration: none;
+  color: var(--text);
+}
+
+/* 語言切換：兩顆並排的小膠囊 */
+.lang { display: flex; gap: 4px; }
+
+.lang button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border-input);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.lang button[aria-pressed="true"] {
+  background: var(--action);
+  border-color: var(--action);
+  color: #fff;
+  font-weight: 600;
+}
+
+
+/* ===== 卡片 ===== */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad-card);
+  margin-bottom: var(--gap);
+}
+
+.card--lift { box-shadow: var(--lift-1); }
+
+
+/* ===== 首頁的兩個入口 ===== */
+
+.entry {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--pad-card);
+  margin-bottom: var(--gap);
+  text-decoration: none;
+  color: var(--text);
+  box-shadow: var(--lift-1);
+}
+
+.entry:hover { box-shadow: var(--lift-2); }
+.entry .entry-title { font-size: var(--fs-lg); font-weight: 700; }
+.entry .entry-desc { color: var(--text-muted); font-size: var(--fs-sm); }
+
+
+/* ===== 表單 ===== */
+
+.field { margin-bottom: var(--gap); }
+
+.field label {
+  display: block;
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  margin-bottom: 6px;
+}
+
+.field .hint {
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
+  margin-top: 4px;
+}
+
+input[type="email"],
+input[type="text"],
+input[type="date"] {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 10px 12px;
+  font-size: var(--fs-input);
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+}
+
+/* 查詢方式的三個分頁 */
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--gap);
+  flex-wrap: wrap;
+}
+
+.tabs button {
+  flex: 1 1 auto;
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  border: 1px solid var(--border-input);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tabs button[aria-pressed="true"] {
+  background: var(--action);
+  border-color: var(--action);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 18px;
+  border: 1px solid var(--action);
+  border-radius: var(--radius-sm);
+  background: var(--action);
+  color: #fff;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn:active { background: var(--action-press); }
+.btn[disabled] { opacity: .55; cursor: default; }
+
+
+/* ===== 查詢結果 ===== */
+
+.result-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: var(--sec-gap) 0 var(--gap);
+}
+
+.result-head h2 { margin: 0; }
+.result-head .count { color: var(--text-muted); font-size: var(--fs-sm); }
+
+/* 一筆接送 = 一張卡。手機上是卡片，不是橫向表格 */
+.booking {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--pad-card);
+  margin-bottom: var(--gap);
+  box-shadow: var(--lift-1);
+}
+
+/* 左邊那條色帶就是「接 / 送」的視覺區分，不必看文字也分得出來 */
+.booking--pickup  { border-left-color: var(--ok); }
+.booking--dropoff { border-left-color: var(--info); }
+
+/* 已取消的整張變淡，但不要淡到看不見 */
+.booking--cancelled { opacity: .62; }
+
+.booking-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.booking-date {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+
+.booking-arah {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+}
+
+.arah--pickup  { color: var(--ok);   background: var(--ok-bg);   border-color: var(--ok-border); }
+.arah--dropoff { color: var(--info); background: var(--info-bg); border-color: var(--info-border); }
+
+.badge {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  margin-left: auto;
+}
+
+.badge--done      { color: var(--text-muted); background: var(--surface-alt); border-color: var(--border-strong); }
+.badge--postponed { color: var(--warn);   background: var(--warn-bg);   border-color: var(--warn-border); }
+.badge--pending   { color: var(--warn);   background: var(--warn-bg);   border-color: var(--warn-border); }
+.badge--cancelled { color: var(--danger); background: var(--danger-bg); border-color: var(--danger-border); }
+
+.booking-name {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.booking-name .cn { color: var(--text-muted); font-weight: 400; }
+
+/* 欄位清單：手機上是兩欄（標籤 + 值） */
+.kv {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) 1fr;
+  gap: 4px 12px;
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+
+.kv dt { color: var(--text-subtle); }
+.kv dd { margin: 0; }
+.kv dd strong { font-weight: 700; }
+
+/* 出車時間是這張卡上最重要的一個數字，給它一點重量 */
+.kv .big { font-size: var(--fs-body); font-weight: 700; }
+
+.booking-note {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  font-size: var(--fs-sm);
+}
+
+.booking-vehicle {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-strong);
+}
+
+
+/* ===== 狀態訊息 ===== */
+
+.msg {
+  padding: var(--pad-card);
+  border-radius: var(--radius);
+  border: 1px solid;
+  text-align: center;
+}
+
+.msg--empty { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+.msg--error { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+
+/* 載入中的骨架：讓使用者知道東西在來的路上，
+   而不是盯著一片空白猜是不是壞了 */
+.skeleton {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad-card);
+  margin-bottom: var(--gap);
+}
+
+.skeleton .bar {
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-alt);
+  margin-bottom: 10px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton .bar:nth-child(1) { width: 45%; height: 20px; }
+.skeleton .bar:nth-child(2) { width: 80%; }
+.skeleton .bar:nth-child(3) { width: 60%; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* 動畫會讓部分使用者不適，尊重系統設定 */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton .bar { animation: none; }
+}
+
+.loading-note {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  margin-top: 8px;
+}
+
+
+/* ===== 頁尾 ===== */
+
+.foot {
+  margin-top: var(--sec-gap);
+  padding: var(--gap) 0 var(--sec-gap);
+  text-align: center;
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  border-top: 1px solid var(--border);
+}
+
+.foot a { color: var(--text-subtle); }
+
+
+/* ===== 列印 ===== */
+
+/* ⚠️ 斷點一律寫成 @media screen and (...)。少了 screen 的話，
+   A4 扣掉邊界約 703px 會誤觸發手機版排版，印出來變成窄窄一條。 */
+@media print {
+  :root {
+    --fs-xs: 11px; --fs-sm: 12px; --fs-body: 13px;
+    --fs-lg: 15px; --fs-title: 20px;
+    --gap: 10px; --pad-card: 12px; --sec-gap: 18px;
+  }
+  body { background: #fff; }
+  .topbar, .tabs, .btn, .foot { display: none; }
+  .booking { break-inside: avoid; box-shadow: none; }
+}
