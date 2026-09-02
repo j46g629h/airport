@@ -5,16 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Login Admin — Antar Jemput Bandara</title>
-<link rel="stylesheet" href="css/style.css?v=0.6">
+<link rel="stylesheet" href="css/style.css?v=0.7">
 </head>
 <body>
 
 <!--
-  ⚠️ 這是**佔位頁**，階段 2 會換成真正的管理者登入。
+  ⚠️ 登入 / 忘記密碼 / 強制改密碼**三個畫面都在這一頁**（切換顯示，不換網址）。
 
-  為什麼現在就要有這一頁：頁尾已經放了「管理者登入」連結，
-  沒有這個檔案的話那個連結會 404。壞掉的連結會讓人以為整個系統壞了，
-  而做一頁「開發中」的成本只有這幾行。
+  強制改密碼如果做成另一頁，使用者按「上一頁」就能繞過它——
+  他會停在「已經登入、但密碼還是別人給的那組」的狀態。同一頁就沒有上一頁可以按。
 -->
 
 <header class="topbar">
@@ -29,30 +28,91 @@
   </nav>
 </header>
 
-<main class="wrap">
-  <div class="card">
-    <h1 id="soonTitle">Login Admin</h1>
-    <p id="soonText"></p>
+<main class="wrap wrap--narrow">
+
+  <div id="adminMsg" role="alert" hidden></div>
+
+  <!-- 重新整理後正在確認 token 還有沒有效 -->
+  <div id="panel-loading" class="card" hidden>
+    <div class="skeleton"><div class="bar"></div><div class="bar"></div></div>
   </div>
+
+  <!-- 1. 登入 -->
+  <section id="panel-login" class="card card--lift" hidden>
+    <h1 data-i18n="adm.login.title">Login Admin</h1>
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginAccount" data-i18n="adm.account">Akun</label>
+        <input type="text" id="loginAccount" autocomplete="username" inputmode="email"
+               autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="loginPassword" data-i18n="adm.password">Kata sandi</label>
+        <input type="password" id="loginPassword" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn" id="loginBtn" data-i18n="adm.login.submit">Masuk</button>
+      <p class="foot-link"><a href="#" id="toForgot" data-i18n="adm.forgot.link">Lupa kata sandi?</a></p>
+    </form>
+  </section>
+
+  <!-- 2. 忘記密碼 -->
+  <section id="panel-forgot" class="card card--lift" hidden>
+    <h1 data-i18n="adm.forgot.title">Lupa Kata Sandi</h1>
+    <p class="hint" data-i18n="adm.forgot.desc"></p>
+    <form id="forgotForm">
+      <div class="field">
+        <label for="forgotAccount" data-i18n="adm.account">Akun</label>
+        <input type="text" id="forgotAccount" inputmode="email"
+               autocapitalize="off" spellcheck="false">
+      </div>
+      <button type="submit" class="btn" id="forgotBtn" data-i18n="adm.forgot.submit">Kirim</button>
+      <p class="foot-link"><a href="#" id="backToLogin" data-i18n="adm.backToLogin">Kembali ke login</a></p>
+    </form>
+  </section>
+
+  <!-- 3. 強制改密碼 -->
+  <section id="panel-change" class="card card--lift" hidden>
+    <h1 data-i18n="adm.change.title">Ganti Kata Sandi</h1>
+    <p class="hint" data-i18n="adm.change.desc"></p>
+    <form id="changeForm">
+      <!-- 舊密碼由程式填入（就是剛才登入用的那一組），不用再打一次 -->
+      <input type="password" id="changeOld" autocomplete="current-password" hidden>
+      <div class="field">
+        <label for="changeNew" data-i18n="adm.change.new">Kata sandi baru</label>
+        <input type="password" id="changeNew" autocomplete="new-password">
+        <div class="hint" data-i18n="adm.change.rule"></div>
+      </div>
+      <div class="field">
+        <label for="changeConfirm" data-i18n="adm.change.confirm">Ulangi kata sandi baru</label>
+        <input type="password" id="changeConfirm" autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn" id="changeBtn" data-i18n="adm.change.submit">Simpan</button>
+    </form>
+  </section>
+
+  <!-- 4. 已登入 -->
+  <section id="panel-done" class="card card--lift" hidden>
+    <h1 data-i18n="adm.done.title">Sudah Masuk</h1>
+    <dl class="kv">
+      <dt data-i18n="adm.name">Nama</dt><dd id="doneName"></dd>
+      <dt data-i18n="adm.account">Akun</dt><dd id="doneAccount"></dd>
+      <dt data-i18n="adm.role">Peran</dt><dd id="doneRole"></dd>
+    </dl>
+    <p class="hint" data-i18n="adm.done.soon"></p>
+    <button type="button" class="btn btn--quiet" id="logoutBtn" data-i18n="adm.logout">Keluar</button>
+  </section>
 
   <footer class="foot">
     <div id="footInfo"></div>
   </footer>
+
 </main>
 
-<script src="js/config.js?v=0.6"></script>
-<script src="js/i18n.js?v=0.6"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', initLangSwitch);
-
-  function onLangChanged() {
-    var zh = (getLang() === 'zh');
-    document.getElementById('soonTitle').textContent = zh ? '管理者登入' : 'Login Admin';
-    document.getElementById('soonText').textContent = zh
-      ? '管理功能開發中，預計下一階段開放。目前請直接在 Google 試算表上維護資料。'
-      : 'Fitur admin sedang dikembangkan. Untuk sementara, silakan kelola data langsung di Google Sheet.';
-  }
-</script>
+<script src="js/config.js?v=0.7"></script>
+<script src="js/i18n.js?v=0.7"></script>
+<script src="js/api.js?v=0.7"></script>
+<script src="js/admin-session.js?v=0.7"></script>
+<script src="js/admin-login.js?v=0.7"></script>
 
 </body>
 </html>

@@ -96,6 +96,9 @@ body {
   padding: var(--gap);
 }
 
+/* 登入這種只有一欄表單的頁面，寬度收窄比較好讀 */
+.wrap--narrow { max-width: 460px; }
+
 h1, h2, h3 { margin: 0 0 .4em; line-height: 1.25; }
 h1 { font-size: var(--fs-title); }
 h2 { font-size: var(--fs-lg); }
@@ -301,6 +304,28 @@ input[type="date"] {
 .btn:active { background: var(--action-press); }
 .btn[disabled] { opacity: .55; cursor: default; }
 
+/* 次要動作（登出之類）：一樣好按，但不要跟主要動作搶注意力 */
+.btn--quiet {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border-input);
+}
+.btn--quiet:active { background: var(--surface-alt); }
+
+/* 表單底下的小連結（忘記密碼、返回登入） */
+.foot-link {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+}
+.foot-link a {
+  display: inline-block;
+  min-height: var(--tap-min);
+  line-height: var(--tap-min);
+  padding: 0 12px;
+  color: var(--text-muted);
+}
+
 
 /* ===== 查詢結果 ===== */
 
@@ -420,6 +445,11 @@ input[type="date"] {
 
 .msg--empty { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
 .msg--error { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.msg--ok    { background: var(--ok-bg);     border-color: var(--ok-border);     color: var(--ok); }
+.msg--info  { background: var(--info-bg);   border-color: var(--info-border);   color: var(--info); }
+
+/* 訊息區塊在管理端是放在最上面的，跟下面的卡片留一點距離 */
+#adminMsg { margin-bottom: var(--gap); text-align: left; }
 
 /* 載入中的骨架：讓使用者知道東西在來的路上，
    而不是盯著一片空白猜是不是壞了 */

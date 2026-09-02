@@ -17,12 +17,26 @@
  */
 
 
-/** 路由表。新增 API 就加在這裡。 */
+/**
+ * 路由表。新增 API 就加在這裡。
+ *
+ * ⚠️ 需要登入的 API **一律用 withAuth() 包起來**，不要在各支裡面
+ *    各自寫一次「檢查 token」——總有一支會忘記。集中在這張表，
+ *    漏掉的話一眼就看得出來。只有 SUPER 能做的加第三個參數 true。
+ */
 var ROUTES = {
+  // ── 不需要登入 ──
   ping:          function (p) { return ok_({ pong: true, time: nowStampText_() }); },
   queryByEmail:  function (p) { return queryByEmail(p); },
   queryByDate:   function (p) { return queryByDate(p); },
-  queryByFlight: function (p) { return queryByFlight(p); }
+  queryByFlight: function (p) { return queryByFlight(p); },
+  adminLogin:    function (p) { return adminLogin(p); },
+  adminLogout:   function (p) { return adminLogout(p); },
+  requestPasswordReset: function (p) { return requestPasswordReset(p); },
+
+  // ── 需要登入 ──
+  getAdminProfile:     function (p) { return withAuth(p, function (s) { return getAdminProfile(p, s); }); },
+  adminChangePassword: function (p) { return withAuth(p, function (s) { return adminChangePassword(p, s); }); }
 };
 
 

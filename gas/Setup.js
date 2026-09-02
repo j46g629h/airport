@@ -387,6 +387,114 @@ function updateStructure() {
 
 
 /* ══════════════════════════════════════════════════════════════
+   1b. 管理者帳號（一次性 ＋ 救援）
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * 第一個超級管理者。改這裡再執行 createFirstSuperAdmin()。
+ * ⚠️ 這裡**只有帳號和姓名，沒有密碼**——密碼由程式亂數產生。
+ *    `gas/` 會跟著 git 上傳到公開的 repo，寫在裡面等於公開貼在網路上。
+ */
+var FIRST_SUPER = {
+  account: 'j46g629h@hotmail.com',
+  name: 'Ken Wang'
+};
+
+
+/**
+ * 建立第一個超級管理者。只能在名單是空的時候執行。
+ *
+ * 密碼亂數產生、印在「執行紀錄」上，第一次登入會被強制改掉。
+ * ⚠️ 印出來的那組密碼**只會出現這一次**，執行完立刻複製走。
+ *    忘了也沒關係，執行 emergencyResetSuper() 就會給你新的一組。
+ */
+function createFirstSuperAdmin() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.ADMIN);
+  if (!sheet) throw new Error('找不到 ' + SHEETS.ADMIN + ' 分頁，請先執行 setupSheet()');
+
+  var existing = readAllAdmins_();
+  if (existing.length) {
+    var msg = '名單裡已經有 ' + existing.length + ' 個帳號，不重複建立。\n' +
+              '  忘記密碼請執行 emergencyResetSuper()，不要用這一支。';
+    Logger.log(msg);
+    return msg;
+  }
+
+  var map = buildColumnMap_(sheet, ADMIN_COLUMNS);
+  var row = FIRST_DATA_ROW;
+  var password = generateTempPassword_();
+
+  setTextCell_(sheet, row, map.account, str_(FIRST_SUPER.account).toLowerCase());
+  setTextCell_(sheet, row, map.name, FIRST_SUPER.name);
+  setTextCell_(sheet, row, map.role, ADMIN_ROLES.SUPER);
+  setTextCell_(sheet, row, map.status, ADMIN_STATUS.ACTIVE);
+  setAdminPassword_(row, password, true);            // true = 第一次登入強制改
+
+  var out = [
+    '已建立超級管理者：',
+    '    帳號　：' + FIRST_SUPER.account,
+    '    姓名　：' + FIRST_SUPER.name,
+    '    初始密碼：' + password,
+    '',
+    '⚠️ 這組密碼只會出現這一次，現在就複製走。',
+    '⚠️ 第一次登入會被要求立刻設定新密碼。',
+    '',
+    '登入頁：https://j46g629h.github.io/airport/admin.html'
+  ].join('\n');
+  Logger.log(out);
+  return out;
+}
+
+
+/**
+ * 救援：重設超級管理者的密碼。
+ *
+ * ⚠️ 這是「只有一位超管」這個決定的配套。
+ *    重設密碼是超管專屬功能，而他是唯一的超管——忘記密碼時
+ *    沒有任何人能幫他。這支從 Apps Script 編輯器直接執行，
+ *    不依賴登入、不依賴寄信，是最後一道保險。
+ *
+ * 它會同時：產生新密碼、清掉登入失敗鎖定、作廢他手上所有 token。
+ */
+function emergencyResetSuper() {
+  var supers = readAllAdmins_().filter(function (a) {
+    return normalizeRole_(a.role) === ADMIN_ROLES.SUPER;
+  });
+  if (!supers.length) {
+    var none = '名單裡沒有任何超級管理者。請先執行 createFirstSuperAdmin()。';
+    Logger.log(none);
+    return none;
+  }
+
+  var lines = ['已重設 ' + supers.length + ' 個超級管理者帳號的密碼：', ''];
+  supers.forEach(function (a) {
+    var password = generateTempPassword_();
+    setAdminPassword_(a.row, password, true);
+    clearLoginFailures_(a.account);
+    storeRemove(STORE_KEYS.TEMP_PW + str_(a.account).toLowerCase());
+    var revoked = revokeSessionsForAccount_(a.account);
+
+    // 順便把狀態改回啟用——不然萬一是「不小心把自己停用」，重設密碼也進不去
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ADMIN);
+    var map = buildColumnMap_(sheet, ADMIN_COLUMNS);
+    setTextCell_(sheet, a.row, map.status, ADMIN_STATUS.ACTIVE);
+
+    lines.push('    帳號　：' + a.account);
+    lines.push('    新密碼：' + password);
+    lines.push('    （已解除鎖定、已作廢 ' + revoked + ' 個登入中的 token、狀態設為啟用）');
+    lines.push('');
+  });
+  lines.push('⚠️ 密碼只會出現這一次，現在就複製走。登入後會被要求立刻改掉。');
+
+  var out = lines.join('\n');
+  Logger.log(out);
+  logInfo_('emergencyResetSuper', '從編輯器執行救援重設', supers.length + ' 個帳號');
+  return out;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
    2. 週分頁
    ══════════════════════════════════════════════════════════════ */
 

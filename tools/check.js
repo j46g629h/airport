@@ -151,7 +151,54 @@ function checkVersions() {
 }
 
 
-/* ── 5. 個資檔案有沒有被 git 擋住 ────────────────────────── */
+/* ── 5. 翻譯有沒有漏 ────────────────────────────────────── */
+
+/**
+ * 兩件事：
+ *   a) 印尼文與中文的字串一一對應（漏翻一句，那一句會直接印出 key，很醜）
+ *   b) HTML 裡每個 data-i18n="..." 用到的 key 都真的存在
+ *
+ * 這種錯不會讓程式壞掉，所以測不出來——通常是使用者反映
+ * 「有一句沒翻到」才發現，而那時候它已經在線上好幾天了。
+ */
+function checkI18n() {
+  let I18N;
+  try {
+    // i18n.js 用 const 宣告，vm 裡取不到，所以在結尾補一個表達式當回傳值
+    const src = read('js/config.js') + '\n' + read('js/i18n.js') + '\nI18N;';
+    const ctx = vm.createContext({
+      document: { documentElement: {}, querySelectorAll: () => [], getElementById: () => null },
+      localStorage: { getItem: () => null, setItem: () => {} },
+    });
+    I18N = vm.runInContext(src, ctx, { filename: 'js/i18n.js' });
+  } catch (e) {
+    return fail('讀不到 I18N 字典：' + e.message);
+  }
+  if (!I18N || !I18N.id || !I18N.zh) return fail('js/i18n.js 裡找不到 I18N.id / I18N.zh');
+
+  const idKeys = Object.keys(I18N.id);
+  const zhKeys = Object.keys(I18N.zh);
+  const onlyId = idKeys.filter(k => !(k in I18N.zh));
+  const onlyZh = zhKeys.filter(k => !(k in I18N.id));
+  if (onlyId.length) fail('這些字串只有印尼文、沒有中文：' + onlyId.join('、'));
+  if (onlyZh.length) fail('這些字串只有中文、沒有印尼文：' + onlyZh.join('、'));
+
+  // HTML 上用到但字典裡沒有的 key
+  const missing = new Set();
+  fs.readdirSync(ROOT).filter(f => f.endsWith('.html')).forEach(f => {
+    [...read(f).matchAll(/data-i18n(?:-ph)?="([^"]+)"/g)].forEach(m => {
+      if (!(m[1] in I18N.id) || !(m[1] in I18N.zh)) missing.add(f + ' → ' + m[1]);
+    });
+  });
+  if (missing.size) fail('HTML 用到不存在的翻譯 key：\n      ' + [...missing].join('\n      '));
+
+  if (!onlyId.length && !onlyZh.length && !missing.size) {
+    ok('翻譯完整：兩種語言各 ' + idKeys.length + ' 句，HTML 用到的 key 都存在');
+  }
+}
+
+
+/* ── 6. 個資檔案有沒有被 git 擋住 ────────────────────────── */
 
 function checkGitignore() {
   const mustIgnore = ['airport.xls', 'data/人員名冊_初版.csv', 'data/接送資料_轉檔.csv'];
@@ -176,6 +223,7 @@ function main() {
   checkDuplicateFunctions();
   checkControlChars();
   const version = checkVersions();
+  checkI18n();
   checkGitignore();
 
   console.log(notes.join('\n'));

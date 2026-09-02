@@ -10,7 +10,7 @@
 
 var SYSTEM_INFO = {
   name: '機場接送系統',
-  version: '0.6',
+  version: '0.7',
   timezone: 'Asia/Jakarta',
   locale: 'id_ID'
 };
@@ -34,6 +34,38 @@ var SHEETS = {
 
 /** 資料列從第幾列開始（第 1 列是表頭） */
 var FIRST_DATA_ROW = 2;
+
+
+/* ────────────────────────────────────────────────────────────────
+   登入與權限
+   ──────────────────────────────────────────────────────────────── */
+
+var ADMIN_ROLES  = { SUPER: 'SUPER', ADMIN: 'ADMIN' };
+var ADMIN_STATUS = { ACTIVE: 'ACTIVE', DISABLED: 'DISABLED' };
+
+var AUTH = {
+  SALT_LENGTH:     32,
+  HASH_ITERATIONS: 1000,      // 見 Auth.js 說明為什麼要迭代
+  MIN_PASSWORD_LENGTH: 8,     // 使用者決定：只要 8 碼，不要求大小寫符號
+
+  TOKEN_TTL:       6 * 3600,  // 登入效期 6 小時
+
+  MAX_LOGIN_FAILS: 5,         // 連續失敗幾次鎖定
+  LOCKOUT_SECONDS: 15 * 60,   // 鎖多久
+
+  // 「忘記密碼」的限流與臨時密碼效期
+  RESET_COOLDOWN_SECONDS: 10 * 60,
+  TEMP_PASSWORD_TTL:      30 * 60,
+  TEMP_PASSWORD_LENGTH:   10
+};
+
+/** Store（PropertiesService）的鍵前綴 */
+var STORE_KEYS = {
+  TOKEN:      'admin_token_',
+  LOGIN_FAIL: 'login_fail_',
+  TEMP_PW:    'temp_pw_',
+  RESET_COOL: 'reset_cool_'
+};
 
 /** 建立分頁時預先套用格式與驗證的列數 */
 var PREP_ROWS_WEEK   = 200;
@@ -199,8 +231,18 @@ var ADMIN_COLUMNS = [
   { code: 'must_change',    name: 'must_change_password', width: 120, format: '@' },
   { code: 'pwd_changed_at', name: 'password_changed_at',  width: 150, format: '@' },
   { code: 'last_login_at',  name: 'last_login_at',  width: 150, format: '@' },
+  /* ⚠️ 這兩欄目前**程式不會讀也不會寫**。
+     登入失敗次數與鎖定時間的唯一來源是 Store（PropertiesService），
+     見 gas/Auth.js。Sheet 上再存一份必然會跟 Store 對不起來，
+     而「兩份資料誰對」是最難查的一種 bug。
+     欄位留著是為了日後若要在 Sheet 上直接看，不必再改資料結構。 */
   { code: 'failed_count',   name: 'failed_count',   width: 90,  format: '@' },
-  { code: 'locked_until',   name: 'locked_until',   width: 150, format: '@' }
+  { code: 'locked_until',   name: 'locked_until',   width: 150, format: '@' },
+
+  /* 通知信箱。空白就寄到 account 本身。
+     ⚠️ 「忘記密碼」的臨時密碼**只會寄到這裡或 account**，
+     不接受呼叫端指定收件人——不然任何人都能把你的臨時密碼寄到自己信箱。 */
+  { code: 'email_notif',    name: 'email_notif',    width: 200, format: '@', optional: true }
 ];
 
 var LOG_COLUMNS = [

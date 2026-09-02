@@ -1,0 +1,88 @@
+/**
+ * admin-session.js — 管理端的登入狀態
+ *
+ * 所有管理頁共用。管理頁的 <script> 一定要在 api.js 之後、
+ * 該頁自己的邏輯之前載入它。
+ *
+ * ⚠️ token 存 sessionStorage，**不是 localStorage**。
+ *    關掉分頁就失效——共用電腦上處理完直接關視窗，下一個人打不開。
+ *    localStorage 會一直留著，那在工廠的共用電腦上是很危險的。
+ *
+ * ⚠️ token 一律放在 POST 的 body，不放在 header 也不放在網址。
+ *    放網址會留在瀏覽器歷史與伺服器日誌；放 header 會觸發 CORS 預檢，
+ *    而 Apps Script 不支援 doOptions（見 js/api.js 檔頭）。
+ */
+
+const SS_TOKEN   = 'airport.admin.token';
+const SS_PROFILE = 'airport.admin.profile';
+
+
+/** ⚠️ 無痕視窗、空間滿了、關掉網站資料都會讓 sessionStorage 丟例外，一律包起來 */
+function getToken() {
+  try { return sessionStorage.getItem(SS_TOKEN) || ''; }
+  catch (e) { return ''; }
+}
+
+function setSession(token, profile) {
+  try {
+    sessionStorage.setItem(SS_TOKEN, token || '');
+    sessionStorage.setItem(SS_PROFILE, JSON.stringify(profile || {}));
+  } catch (e) { /* 存不進去只是重新整理後要重新登入，不影響當下操作 */ }
+}
+
+function getProfile() {
+  try { return JSON.parse(sessionStorage.getItem(SS_PROFILE) || '{}'); }
+  catch (e) { return {}; }
+}
+
+function clearSession() {
+  try {
+    sessionStorage.removeItem(SS_TOKEN);
+    sessionStorage.removeItem(SS_PROFILE);
+  } catch (e) { /* 清不掉就算了，token 6 小時後自己失效 */ }
+}
+
+
+/** 帶著 token 呼叫管理端 API */
+function apiAuth(action, body, canRetry) {
+  const payload = Object.assign({ action: action, token: getToken() }, body || {});
+  return Api.post(payload, canRetry === true);
+}
+
+
+/**
+ * 登出。
+ * ⚠️ 一定要打後端那一支——token 存在 PropertiesService，是真的刪得掉的，
+ *    所以這是真正的伺服器端登出，不是只把本機的清掉而已。
+ *    只清本機的話，那支 token 在效期內（6 小時）仍然有效。
+ */
+async function doLogout(redirectTo) {
+  const token = getToken();
+  clearSession();
+  if (token) {
+    try { await Api.post({ action: 'adminLogout', token: token }, false); }
+    catch (e) { /* 網路失敗也要讓他離開這一頁 */ }
+  }
+  location.href = redirectTo || 'admin.html';
+}
+
+
+/**
+ * 其他管理頁在載入時呼叫：確認還登入著，順便取回姓名與角色。
+ * 沒登入或已過期就導回登入頁。
+ *
+ * @return {Object|null} 通過回傳 profile，失敗回傳 null（此時已經在導頁了）
+ */
+async function requireLogin() {
+  if (!getToken()) { location.href = 'admin.html'; return null; }
+  try {
+    const res = await apiAuth('getAdminProfile', {}, true);
+    if (!res || !res.ok) { clearSession(); location.href = 'admin.html'; return null; }
+    if (res.data.must_change_password) { location.href = 'admin.html'; return null; }
+    setSession(getToken(), res.data);
+    return res.data;
+  } catch (e) {
+    // 連線問題不要把人踢出去——他可能只是網路不穩，踢掉等於要他重打一次密碼
+    return getProfile();
+  }
+}

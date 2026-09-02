@@ -21,8 +21,26 @@ function jsonOut_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function ok_(data)          { return jsonOut_({ ok: true, data: data, v: SYSTEM_INFO.version }); }
-function fail_(code, msg)   { return jsonOut_({ ok: false, error: code, message: msg, v: SYSTEM_INFO.version }); }
+function ok_(data) { return jsonOut_({ ok: true, data: data, v: SYSTEM_INFO.version }); }
+
+/**
+ * @param {string} code  錯誤代碼。⚠️ 前端靠這個翻譯，所以是代碼不是句子
+ * @param {string} msg   給代碼的補充資料（例如還剩幾次機會），可省略
+ * @param {Object} extra 額外要帶回前端的欄位，可省略
+ */
+function fail_(code, msg, extra) {
+  var out = { ok: false, error: code, message: msg == null ? '' : String(msg), v: SYSTEM_INFO.version };
+  if (extra) Object.keys(extra).forEach(function (k) { out[k] = extra[k]; });
+  return jsonOut_(out);
+}
+
+/** 任何值 → 去頭尾空白的字串。null / undefined 都變成 '' */
+function str_(v) { return String(v == null ? '' : v).trim(); }
+
+function isTrue_(v) {
+  var s = str_(v).toUpperCase();
+  return s === 'TRUE' || s === 'YES' || s === 'Y' || s === '1' || s === '是';
+}
 
 
 /* ══════════════════════════════════════════════════════════════
