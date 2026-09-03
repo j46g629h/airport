@@ -33,6 +33,19 @@
 var AUTOFILL_MAX_ROWS = 200;
 
 /**
+ * 名冊上「有問題的那一格」的底色。
+ *
+ * ⚠️ 兩個顏色是兩種意思，不可以混用——這是號誌燈，不是裝飾：
+ *   紅 = 確定有問題，一定要處理
+ *   黃 = 疑似有問題，請你看一眼；確認沒事就忽略它
+ *
+ * 色碼跟前端 css/style.css 的 --danger-bg / --warn-bg 是同一組，
+ * 這樣試算表跟網頁對「錯誤」與「注意」用的是同一套視覺語言。
+ */
+var MARK_DUP_BG  = '#FBEDEC';   // 紅：確定重複
+var MARK_TYPO_BG = '#FBF2E3';   // 黃：疑似打錯字
+
+/**
  * 依名冊自動帶入的欄位。**清除時也是清這一份清單，兩邊必須是同一份。**
  *
  * ⚠️ email 一定要在裡面。踩過一次：email 原本是特例處理（只在「用姓名找到人」時
@@ -430,7 +443,12 @@ function onEditPerson_(e, sheet) {
 
 
 /**
- * 把重複的人標成紅底並加上註解；不重複的就把標記清掉。
+ * 人員名冊的問題標記。兩層，用顏色區分嚴重度：
+ *
+ *   🔴 紅底　email ＋ 姓名**完全一樣** → 確定是同一個人建了兩次
+ *   🟡 黃底　同一個 email 底下，姓名只差一兩個字母 → 疑似打成兩種拼法
+ *
+ * 沒問題的就把標記清掉，所以刪掉重複的那一列之後，殘留的標記會自己消失。
  * 跟航班名冊同一套做法（見 markFlightDuplicates_），只有「什麼算重複」不一樣。
  *
  * ⚠️ **不可以只看 email。** 眷屬與員工共用同一個 email 是**刻意的設計**
@@ -453,30 +471,77 @@ function markPersonDuplicates_(sheet) {
   var iName  = colIndexOf_(PERSON_COLUMNS, 'name');
   var values = sheet.getRange(FIRST_DATA_ROW, 1, last - 1, PERSON_COLUMNS.length).getValues();
 
-  // 先數每個「email ＋ 姓名」各出現在哪幾列
-  var rowsOf = {};
-  values.forEach(function (r, i) {
-    var key = personKey_(r[iEmail - 1], r[iName - 1]);
-    if (!key) return;
-    (rowsOf[key] = rowsOf[key] || []).push(FIRST_DATA_ROW + i);
+  // 每一列先算出正規化的 email 與姓名（大小寫、多餘空白都壓掉）
+  var rows = values.map(function (r, i) {
+    return {
+      row:   FIRST_DATA_ROW + i,
+      email: str_(r[iEmail - 1]).toLowerCase(),
+      name:  str_(r[iName - 1]).toLowerCase().replace(/\s+/g, ' ')
+    };
+  });
+
+  // ── 第一層：email ＋ 姓名完全一樣 → 確定重複（紅） ──
+  var sameRows = {};
+  rows.forEach(function (o) {
+    if (!o.email || !o.name) return;
+    var k = o.email + '|' + o.name;
+    (sameRows[k] = sameRows[k] || []).push(o.row);
+  });
+
+  // ── 第二層：同一個 email 底下，姓名很像但不一樣 → 疑似打錯字（黃） ──
+  //
+  // ⚠️ **只在同一個 email 群組內比對**，不是拿全名冊兩兩比。
+  //    一個 email 底下通常只有 2~4 個人（一家人），範圍小、誤報機率低；
+  //    全名冊兩兩比的話，「Mr Andy Chen」跟「Mr Andy Chan」這種
+  //    毫不相干的兩個人也會被標起來。
+  var byEmail = {};
+  rows.forEach(function (o) {
+    if (!o.email || !o.name) return;
+    (byEmail[o.email] = byEmail[o.email] || []).push(o);
+  });
+
+  var typoRows = {};                       // 列號 → [疑似對象的列號…]
+  Object.keys(byEmail).forEach(function (e) {
+    var g = byEmail[e];
+    for (var i = 0; i < g.length; i++) {
+      for (var j = i + 1; j < g.length; j++) {
+        if (!looksLikeTypo_(g[i].name, g[j].name)) continue;
+        (typoRows[g[i].row] = typoRows[g[i].row] || []).push(g[j].row);
+        (typoRows[g[j].row] = typoRows[g[j].row] || []).push(g[i].row);
+      }
+    }
   });
 
   var backgrounds = [];
   var notes = [];
-  values.forEach(function (r, i) {
-    var key = personKey_(r[iEmail - 1], r[iName - 1]);
-    var dup = key && rowsOf[key].length > 1;
-    backgrounds.push([dup ? '#FBEDEC' : null]);
-    notes.push([dup
-      ? '⚠️ 名冊重複\n' +
-        '同一個人也出現在第 ' +
-        rowsOf[key].filter(function (n) { return n !== FIRST_DATA_ROW + i; }).join('、') +
-        ' 列（email 與姓名都一樣）。\n\n' +
+  rows.forEach(function (o) {
+    var key = (o.email && o.name) ? (o.email + '|' + o.name) : '';
+    var dupWith  = key && sameRows[key].length > 1
+      ? sameRows[key].filter(function (n) { return n !== o.row; }) : null;
+    // ⚠️ 確定重複優先。一列同時符合兩者時顯示紅色——
+    //    「確定要處理」比「請你確認一下」嚴重，不可以被蓋掉。
+    var typoWith = !dupWith ? typoRows[o.row] : null;
+
+    if (dupWith) {
+      backgrounds.push([MARK_DUP_BG]);
+      notes.push(['⚠️ 名冊重複\n' +
+        '同一個人也出現在第 ' + dupWith.join('、') + ' 列（email 與姓名都一樣）。\n\n' +
         '同一個人建兩次的後果：\n' +
         '· 改房號或停用時只會改到其中一筆，另一筆繼續生效\n' +
-        '· 兩筆的值一旦不一樣，輸入接送資料時那個欄位就會**安靜地不再自動帶入**\n\n' +
-        '請把多餘的那一列刪掉（歷史紀錄不會受影響）。'
-      : '']);
+        '· 兩筆的值一旦不一樣，輸入接送資料時那個欄位就會安靜地不再自動帶入\n\n' +
+        '請把多餘的那一列刪掉（歷史紀錄不會受影響）。']);
+    } else if (typoWith) {
+      backgrounds.push([MARK_TYPO_BG]);
+      notes.push(['❓ 疑似打錯字\n' +
+        '第 ' + typoWith.join('、') + ' 列有一個「同一個 email、姓名只差一兩個字母」的人。\n\n' +
+        '常見的情況是同一個人被打成兩種拼法（例如 Fankie / Frankie）。\n' +
+        '是的話請把錯的那一列刪掉。\n\n' +
+        '如果確實是兩個不同的人（例如兄弟名字很像），忽略這個提示就好，\n' +
+        '它不影響任何功能。']);
+    } else {
+      backgrounds.push([null]);
+      notes.push(['']);
+    }
   });
 
   var range = sheet.getRange(FIRST_DATA_ROW, iName, last - 1, 1);
@@ -486,17 +551,56 @@ function markPersonDuplicates_(sheet) {
 
 
 /**
- * 名冊的「同一個人」怎麼認：email ＋ 姓名，**兩個都有值**才算。
+ * 同一個 email 底下的兩個姓名，像不像是「同一個人被打成兩種拼法」。
  *
- * 只有其中一個的（打到一半的列）一律不判斷——
- * 打字打到 email 那一格時，姓名還是空的，這時候標紅底只會嚇到人。
+ * 門檻刻意訂得保守，因為**誤報的代價比漏抓高**：
+ * 標了一個其實沒問題的，管理者第二次看到就會開始無視所有黃底，
+ * 那等於把這個功能整個廢掉。漏抓的話還有每日資料健檢當第二道。
  *
- * 大小寫與多餘空白都正規化掉：'Mr  Kyle Ma' 跟 'mr kyle ma' 是同一個人。
+ *   差 1 個字母 → 姓名至少 10 個字（Fankie / Frankie 差 1，長度 13~14）
+ *   差 2 個字母 → 姓名至少 14 個字（短名字差兩個字，通常真的是兩個人）
+ *
+ * ⚠️ 太短的名字一律不判斷。'Mr A Lin' 跟 'Mr B Lin' 也只差一個字母，
+ *    但那顯然是兩個人——短字串的「差一個字母」不代表任何東西。
  */
-function personKey_(email, name) {
-  var e = str_(email).toLowerCase();
-  var n = str_(name).toLowerCase().replace(/\s+/g, ' ');
-  return (e && n) ? (e + '|' + n) : '';
+function looksLikeTypo_(a, b) {
+  if (a === b) return false;                              // 完全一樣走紅底那條，不是這裡的事
+  var maxLen = Math.max(a.length, b.length);
+  if (maxLen < 10) return false;
+  if (Math.abs(a.length - b.length) > 2) return false;    // 早退，省掉大部分的計算
+  var d = editDistance_(a, b);
+  if (d === 1) return true;                               // 上面已經擋掉 maxLen < 10
+  if (d === 2) return maxLen >= 14;
+  return false;
+}
+
+
+/**
+ * 編輯距離（Levenshtein）：把 a 改成 b 最少要幾次「增／刪／改一個字」。
+ *
+ * 只用在同一個 email 底下的姓名比對，字串都很短（十幾個字）、
+ * 一個 email 通常只有 2~4 個人，所以成本可以忽略。
+ * 只保留兩列而不是整張表，記憶體是 O(較短的那個字串)。
+ */
+function editDistance_(a, b) {
+  var la = a.length, lb = b.length;
+  if (!la) return lb;
+  if (!lb) return la;
+
+  var prev = [], cur = [], j;
+  for (j = 0; j <= lb; j++) prev[j] = j;
+
+  for (var i = 1; i <= la; i++) {
+    cur[0] = i;
+    for (j = 1; j <= lb; j++) {
+      var cost = (a.charAt(i - 1) === b.charAt(j - 1)) ? 0 : 1;
+      cur[j] = Math.min(cur[j - 1] + 1,        // 插入
+                        prev[j] + 1,           // 刪除
+                        prev[j - 1] + cost);   // 取代
+    }
+    prev = cur.slice();
+  }
+  return prev[lb];
 }
 
 
@@ -617,7 +721,7 @@ function markFlightDuplicates_(sheet) {
   values.forEach(function (r, i) {
     var code = normPlate_(r[0]).replace(/\s+/g, '');
     var dup = code && rowsOf[code].length > 1;
-    backgrounds.push([dup ? '#FBEDEC' : null]);
+    backgrounds.push([dup ? MARK_DUP_BG : null]);
     notes.push([dup
       ? '⚠️ 航班號重複\n' + code + ' 也出現在第 ' +
         rowsOf[code].filter(function (n) { return n !== FIRST_DATA_ROW + i; }).join('、') +
