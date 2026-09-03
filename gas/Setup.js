@@ -9,7 +9,9 @@
  *
  * 另外兩支維護用的：
  *   refreshDropdowns()    在 PENGATURAN 加了新的廠別 / 部門 / 上車地點之後跑
- *   ensureNextWeekSheet() 建立下一週的分頁（之後會改成每週自動執行）
+ *   ensureUpcomingWeekSheets() 建好從今天起半年份的週分頁（排程每天自動執行）
+ *   addWeekSheetForDate()     建立更遠的某一週（改 TARGET_WEEK_DATE 再執行）
+ *   repairWeekSheets()        認養手動建立的分頁、補格式、排序
  *
  * ⚠️ setupSheet() 重複執行是安全的：已存在的分頁不會被清空，只會補上缺的東西。
  */
@@ -517,29 +519,40 @@ function weekSheetName_(date) {
 }
 
 /**
- * 找出（或建立）某個日期所屬的週分頁。
+ * 找出某個日期所屬的週分頁；沒有就回傳 null。
  *
- * ⚠️ 靠 developer metadata 的 weekStart 找，不靠分頁名稱。
+ * ⚠️ 先靠 developer metadata 的 weekStart 找，找不到才退回用名稱找。
  *    有人把分頁改名之後，程式照樣找得到同一張，不會另外建一張重複的。
  */
-function ensureWeekSheet(date) {
+function findWeekSheet_(date) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var start = weekStart_(date);
-  var key = isoDate_(start);
+  var key = isoDate_(weekStart_(date));
 
   var found = ss.createDeveloperMetadataFinder().withKey('weekStart').withValue(key).find();
   for (var i = 0; i < found.length; i++) {
     var loc = found[i].getLocation().getSheet();
     if (loc) return loc;
   }
+  return ss.getSheetByName(weekSheetName_(date)) || null;
+}
 
-  var name = weekSheetName_(date);
-  var sheet = ss.getSheetByName(name);
-  if (!sheet) sheet = ss.insertSheet(name);
+
+/**
+ * 找出（或建立）某個日期所屬的週分頁。
+ * 已存在的會順便補上標記與格式，所以對手動建立的分頁執行也是安全的。
+ */
+function ensureWeekSheet(date) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var key = isoDate_(weekStart_(date));
+
+  var sheet = findWeekSheet_(date);
+  if (!sheet) sheet = ss.insertSheet(weekSheetName_(date));
+
   applyStructure_(sheet, MAIN_COLUMNS, PREP_ROWS_WEEK);
-  sheet.addDeveloperMetadata('weekStart', key);
+  if (!weekKeyOf_(sheet)) sheet.addDeveloperMetadata('weekStart', key);
   return sheet;
 }
+
 
 /** 是週分頁的話回傳它的起始日（'2026-08-25'），不是的話回傳 null */
 function weekKeyOf_(sheet) {
@@ -588,32 +601,44 @@ function sortSheets() {
 }
 
 /**
- * 建好「本週 ＋ 未來三週」的分頁。排程每天跑一次。
+ * 建好「從今天起半年份」的週分頁。排程每天跑一次。
  *
  * ⚠️ 這一支是為了讓你**永遠不必手動建立週分頁**。
  *    手動建的分頁沒有 weekStart 標記，程式認不得它——
  *    資料打進去看起來一切正常，但 _INDEX 收不到，app 完全查不到那一整週，
- *    而且**不會有任何錯誤訊息**。（真的手動建了也沒關係，
- *    adoptOrphanWeekSheets_() 會自動認養，見下方。）
+ *    而且**不會有任何錯誤訊息**（設計約定第 7b 條）。
+ *
+ * ⚠️ 一次最多建 MAX_NEW_WEEK_SHEETS_PER_RUN 個。
+ *    一口氣建 27 個會超過 Apps Script 的 6 分鐘上限而被中斷，
+ *    而且不會報錯——你只會發現分頁沒建完。
+ *    排程每天跑，分幾天就補齊了；急的話手動多執行幾次。
  *
  * 重複執行是安全的：已存在的分頁不會被動到。
  */
 function ensureUpcomingWeekSheets() {
   var created = [];
-  var existed = [];
-  for (var i = 0; i <= 21; i += 7) {
+  var existed = 0;
+  var pending = 0;
+
+  for (var i = 0; i <= WEEK_LOOKAHEAD_DAYS; i += 7) {
     var d = new Date();
     d.setDate(d.getDate() + i);
-    var name = weekSheetName_(d);
-    var before = !!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
-    ensureWeekSheet(d);
-    (before ? existed : created).push(name);
+
+    if (findWeekSheet_(d)) { existed++; continue; }
+
+    if (created.length >= MAX_NEW_WEEK_SHEETS_PER_RUN) { pending++; continue; }
+    created.push(ensureWeekSheet(d).getName());
   }
   if (created.length) sortSheets();
 
-  var msg = '週分頁檢查：新建 ' + created.length + ' 個' +
-            (created.length ? '（' + created.join('、') + '）' : '') +
-            '，已存在 ' + existed.length + ' 個';
+  var msg = '週分頁檢查（未來 ' + WEEK_LOOKAHEAD_DAYS + ' 天）：新建 ' + created.length +
+            ' 個，已存在 ' + existed + ' 個';
+  if (created.length) msg += '\n新建：' + created.join('、');
+  if (pending) {
+    msg += '\n⚠️ 還有 ' + pending + ' 週尚未建立（單次上限 ' + MAX_NEW_WEEK_SHEETS_PER_RUN +
+           ' 個，避免超過執行時間）。明天排程會繼續補，' +
+           '要現在補齊就再執行這一支 ' + Math.ceil(pending / MAX_NEW_WEEK_SHEETS_PER_RUN) + ' 次。';
+  }
   Logger.log(msg);
   if (created.length) logInfo_('ensureUpcomingWeekSheets', '自動建立週分頁', created.join('、'));
   return msg;
@@ -622,6 +647,44 @@ function ensureUpcomingWeekSheets() {
 
 /** 舊名字保留，免得有人照舊習慣執行它 */
 function ensureNextWeekSheet() { return ensureUpcomingWeekSheets(); }
+
+
+/**
+ * 要建立哪一天所屬的週分頁。改這裡再執行 addWeekSheetForDate()。
+ * 格式 dd/mm/yyyy（跟全系統一致，日在前）。
+ */
+var TARGET_WEEK_DATE = '25/12/2026';
+
+/**
+ * 建立「更遠的未來」那一週的分頁。
+ *
+ * 每天自動建的只做到未來三週。有人訂了三個月後的機票時，
+ * 那一週的分頁還不存在——改上面的 TARGET_WEEK_DATE 再執行這一支。
+ *
+ * ⚠️ 不要自己在 Sheet 上按右鍵新增分頁。手動建的沒有程式認得的標記，
+ *    資料打進去看起來正常，但 app 完全查不到那一整週，而且不會報錯
+ *    （設計約定第 7b 條）。
+ *
+ * 階段 2d 之後，從 app 新增接送資料時會自動建好對應的週分頁，
+ * 這一支就只剩「直接在 Sheet 上打字」時才用得到。
+ */
+function addWeekSheetForDate() {
+  var d = parseDMY_(TARGET_WEEK_DATE);
+  if (!d) {
+    var bad = 'TARGET_WEEK_DATE 格式不對：「' + TARGET_WEEK_DATE + '」。請用 dd/mm/yyyy，例如 25/12/2026';
+    Logger.log(bad);
+    return bad;
+  }
+
+  var existed = !!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(weekSheetName_(d));
+  var sheet = ensureWeekSheet(d);
+  sortSheets();
+
+  var msg = (existed ? '分頁已經存在：' : '已建立分頁：') + sheet.getName() +
+            '（' + isoToDisplay_(isoDate_(weekStart_(d))) + ' 那一週）';
+  Logger.log(msg);
+  return msg;
+}
 
 
 /**
