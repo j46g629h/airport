@@ -604,6 +604,203 @@ select {
 }
 
 
+/* ===== 班表列表（admin-list.html）===== */
+
+/* 桌機上要一次看到很多筆，760px 太窄了 */
+.wrap--wide { max-width: 1200px; }
+
+/* 日期區間：兩個日期欄位並排，窄螢幕自動疊起來 */
+.daterange {
+  display: flex;
+  gap: var(--gap);
+  flex-wrap: wrap;
+}
+.daterange-one { flex: 1 1 160px; }
+.daterange-lab {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
+  margin-bottom: 4px;
+}
+
+/* 一整排可以按的小按鈕（快捷區間、接／送、狀態） */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ⚠️ 選中的狀態不能只靠顏色深淺——工廠的光線下看不出來。
+   反白＋加粗，隔著兩公尺也分得出哪幾顆是開的。 */
+.chip[aria-pressed="true"] {
+  background: var(--action);
+  border-color: var(--action);
+  color: #fff;
+  font-weight: 600;
+}
+
+.sep {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--gap) 0;
+}
+
+/* 勾選框。整個標籤都可以點，不是只有那個小方塊 */
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+.check input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--action);
+  flex: none;
+}
+
+/* 筆數統計、排序、清除、重新整理並排 */
+.listbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  margin: var(--gap) 0;
+}
+.listbar .count {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.sortbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
+}
+.sortbox select { width: auto; min-width: 140px; }
+
+/* 次要資訊（起降時間、原訂日期、「試算表上還是…」）。
+   ⚠️ 用 block 不用 inline：擠在同一行時，主要資訊會被推到看不見 */
+.subtle {
+  display: block;
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+}
+
+
+/* ── 表格（桌機）↔ 卡片（手機）：同一份 HTML ──────────────
+   兩份 HTML 各寫一次的話，改欄位一定會有一邊忘記改，
+   而且那不會報錯——只是手機上少一欄，很久以後才有人發現。 */
+
+.tablewrap { overflow-x: auto; }
+
+.dtable {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.dtable th,
+.dtable td {
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.dtable thead th {
+  background: var(--surface-alt);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.dtable tbody tr:last-child td { border-bottom: 0; }
+
+/* 接／送用左邊那條色帶區分，跟使用者端的卡片同一套顏色 */
+.drow td:first-child { border-left: 4px solid transparent; }
+.drow--pickup  td:first-child { border-left-color: var(--ok); }
+.drow--dropoff td:first-child { border-left-color: var(--info); }
+.drow--cancelled { opacity: .62; }
+
+/* ⚠️ 中文名與徽章都不可以在內部斷行。
+   手機上欄位很窄，不擋的話「馬凱爾」會斷成「馬凱／爾」、
+   徽章裡的字也會被拆成兩行——兩個都是看起來像壞掉的那種醜。
+   要換行的話整塊掉到下一行，那才是對的。 */
+.drow .cn { color: var(--text-muted); font-weight: 400; white-space: nowrap; }
+.drow .badge { white-space: nowrap; }
+.cell-act { white-space: nowrap; }
+
+/* 展開的詳細資料 */
+.drow-detail td {
+  background: var(--surface-alt);
+  padding: var(--gap) 14px;
+}
+.drow-detail .kv { margin: 0; }
+
+@media screen and (min-width: 761px) {
+  /* 表頭跟著捲動黏在上面。一次看 50 筆時，捲到一半就忘了哪一欄是什麼 */
+  .dtable thead th { position: sticky; top: 0; z-index: 1; }
+}
+
+/* ⚠️ 一定要寫 screen。少了它，A4 扣掉邊界約 703px 會誤觸發，
+   列印出來變成一張一張的卡片而不是表格。 */
+@media screen and (max-width: 760px) {
+  .dtable,
+  .dtable tbody,
+  .dtable tr,
+  .dtable td { display: block; }
+
+  .dtable { border: 0; background: none; }
+  .dtable thead { display: none; }
+
+  .dtable tr.drow {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--border-strong);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    padding: 8px 0;
+  }
+  .drow--pickup  { border-left-color: var(--ok) !important; }
+  .drow--dropoff { border-left-color: var(--info) !important; }
+
+  .dtable td {
+    border: 0;
+    display: flex;
+    gap: 10px;
+    padding: 4px 14px;
+  }
+  .dtable td::before {
+    content: attr(data-label);
+    flex: none;
+    /* ⚠️ 390px 的手機上，欄名佔太寬會把值擠成兩三行。
+       5.5em 是「Jemput/Antar」這種最長的欄名還放得下、
+       值又還有 200px 以上可用」的平衡點 */
+    min-width: 5.5em;
+    color: var(--text-subtle);
+    font-size: var(--fs-sm);
+  }
+  /* 沒有值的欄位整格不顯示——手機上留一排空標籤會把有值的那幾行淹掉 */
+  .dtable td:empty { display: none; }
+  .dtable td[data-label=""]::before { display: none; }
+
+  .dtable tr.drow-detail {
+    margin: -10px 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+  }
+  .drow-detail td { display: block; }
+  .drow-detail td::before { display: none; }
+}
+
+
 /* ===== 列印 ===== */
 
 /* ⚠️ 斷點一律寫成 @media screen and (...)。少了 screen 的話，
@@ -617,4 +814,13 @@ select {
   body { background: #fff; }
   .topbar, .tabs, .btn, .foot { display: none; }
   .booking { break-inside: avoid; box-shadow: none; }
+
+  /* 班表列表：印出來就是一張純表格。
+     篩選條件、排序、「詳細」按鈕都是螢幕上的操作，印在紙上沒有意義 */
+  #filterBox, .listbar, #adminMsg, .cell-act { display: none; }
+  .tablewrap { overflow: visible; }
+  .dtable { border: 0; }
+  .dtable th, .dtable td { border-bottom: 1px solid #999; }
+  .dtable thead { display: table-header-group; }   /* 跨頁時每一頁都印表頭 */
+  .drow { break-inside: avoid; }
 }

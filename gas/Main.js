@@ -37,6 +37,9 @@ var ROUTES = {
   // ── 需要登入 ──
   getAdminProfile:     function (p) { return withAuth(p, function (s) { return getAdminProfile(p, s); }); },
   adminChangePassword: function (p) { return withAuth(p, function (s) { return adminChangePassword(p, s); }); },
+  // ⚠️ 管理端列表沒有「今天以後」的限制，看得到全部歷史——所以一定要包 withAuth，
+  //    這一支若漏了登入檢查，等於把整份歷史紀錄開放給任何知道網址的人
+  listBookings:        function (p) { return withAuth(p, function (s) { return listBookings(p, s); }); },
 
   // ── 只有 SUPER ──（第三個參數 true）
   manageAdmin: function (p) { return withAuth(p, function (s) { return manageAdmin(p, s); }, true); }

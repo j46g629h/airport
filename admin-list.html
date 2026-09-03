@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Daftar Jadwal — Antar Jemput Bandara</title>
+<!-- ⚠️ 改了 CSS 或 JS 一定要把所有 HTML 的 ?v= 一起往上加，
+     js/config.js 與 gas/Config.js 的 version 也要同步（tools/check.js 會比對） -->
+<link rel="stylesheet" href="css/style.css?v=1.8">
+</head>
+<body>
+
+<!--
+  班表列表（階段 2c，唯讀）。新增／修改在 2d。
+
+  ⚠️ 這一頁看得到**全部歷史**，沒有使用者端那條「今天以後」的限制，
+     所以後端那一支一定要包 withAuth（見 gas/Main.js 的路由表）。
+
+  ── 篩選分兩層，是刻意的 ──────────────────────────────
+  「日期區間」要打 API（它決定要讀多少資料，一趟 3~8 秒）；
+  其餘全部在瀏覽器裡做，打字就即時反應。
+  全部都打後端的話，管理者調一次條件等五秒，這一頁就不會有人用。
+-->
+
+<header class="topbar">
+  <a class="backbtn" href="admin.html">
+    <span aria-hidden="true">←</span>
+    <span data-i18n="acc.back">Admin</span>
+  </a>
+  <span class="brand" data-i18n="list.title">Daftar Jadwal</span>
+  <nav class="lang" aria-label="Language">
+    <button type="button" data-lang="id" aria-pressed="true">ID</button>
+    <button type="button" data-lang="zh" aria-pressed="false">中</button>
+  </nav>
+</header>
+
+<main class="wrap wrap--wide">
+
+  <div id="adminMsg" role="alert" hidden></div>
+
+  <div id="content" hidden>
+
+    <section class="card card--lift" id="filterBox">
+
+      <!-- ── 第一層：日期區間。改這個才會重新打 API ── -->
+      <div class="field">
+        <label data-i18n="list.range">Rentang tanggal</label>
+        <div class="daterange">
+          <div class="daterange-one">
+            <span class="daterange-lab" data-i18n="list.from">Dari</span>
+            <!-- ⚠️ <input type="date"> 的顯示順序跟著裝置地區設定走，管不了。
+                 下面那一行由我們控制，一定是 dd/mm/yyyy -->
+            <input type="date" id="fFrom">
+            <div class="picked" id="pickedFrom" aria-live="polite"></div>
+          </div>
+          <div class="daterange-one">
+            <span class="daterange-lab" data-i18n="list.to">Sampai</span>
+            <input type="date" id="fTo">
+            <div class="picked" id="pickedTo" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="chips" id="quickRange">
+          <button type="button" class="chip" data-range="week"   data-i18n="list.quick.week"></button>
+          <button type="button" class="chip" data-range="next14" data-i18n="list.quick.14"></button>
+          <button type="button" class="chip" data-range="month"  data-i18n="list.quick.month"></button>
+          <button type="button" class="chip" data-range="past30" data-i18n="list.quick.past"></button>
+          <button type="button" class="chip" data-range="all"    data-i18n="list.quick.all"></button>
+        </div>
+
+        <button type="button" class="btn" id="searchBtn" data-i18n="list.search">Tampilkan</button>
+      </div>
+
+      <hr class="sep">
+
+      <!-- ── 第二層：即時篩選，不打 API ── -->
+      <p class="hint" data-i18n="list.liveHint"></p>
+
+      <div class="field">
+        <label for="fKeyword" data-i18n="list.keyword">Nama / email / kamar</label>
+        <input type="text" id="fKeyword" data-i18n-ph="list.keyword.ph"
+               autocapitalize="off" spellcheck="false">
+      </div>
+
+      <div class="field">
+        <label data-i18n="list.arah">Jemput / Antar</label>
+        <div class="chips" id="fArah">
+          <button type="button" class="chip" data-val=""        aria-pressed="true"  data-i18n="list.all"></button>
+          <button type="button" class="chip" data-val="PICKUP"  aria-pressed="false" data-i18n="arah.PICKUP"></button>
+          <button type="button" class="chip" data-val="DROPOFF" aria-pressed="false" data-i18n="arah.DROPOFF"></button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="list.status">Status</label>
+        <!-- 可複選。一個都沒選＝全部（按「全部」會把其餘清掉） -->
+        <div class="chips" id="fStatus">
+          <button type="button" class="chip" data-val=""          aria-pressed="true"  data-i18n="list.all"></button>
+          <button type="button" class="chip" data-val="SCHEDULED" aria-pressed="false" data-i18n="status.SCHEDULED"></button>
+          <button type="button" class="chip" data-val="DONE"      aria-pressed="false" data-i18n="status.DONE"></button>
+          <button type="button" class="chip" data-val="POSTPONED" aria-pressed="false" data-i18n="status.POSTPONED"></button>
+          <button type="button" class="chip" data-val="PENDING"   aria-pressed="false" data-i18n="status.PENDING"></button>
+          <button type="button" class="chip" data-val="CANCELLED" aria-pressed="false" data-i18n="status.CANCELLED"></button>
+        </div>
+      </div>
+
+      <button type="button" class="chip" id="toggleMore" data-i18n="list.more">Filter lain</button>
+
+      <div id="moreBox" hidden>
+        <div class="field">
+          <label for="fFactory" data-i18n="f.factory">Factory</label>
+          <select id="fFactory"></select>
+        </div>
+        <div class="field">
+          <label for="fDept" data-i18n="f.dept">Dept</label>
+          <select id="fDept"></select>
+        </div>
+        <div class="field">
+          <label for="fTitik" data-i18n="f.titik">Titik jemput</label>
+          <select id="fTitik"></select>
+        </div>
+        <div class="field">
+          <label for="fFlight" data-i18n="f.flight">NO Pesawat</label>
+          <input type="text" id="fFlight" autocapitalize="characters" spellcheck="false" placeholder="CI761">
+        </div>
+        <label class="check">
+          <input type="checkbox" id="fNeed">
+          <span data-i18n="list.needOnly">Hanya yang ada permintaan</span>
+        </label>
+      </div>
+
+    </section>
+
+    <div class="listbar">
+      <span class="count" id="statLine"></span>
+      <label class="sortbox">
+        <span data-i18n="list.sort">Urutkan</span>
+        <select id="fSort">
+          <option value="date"    data-i18n="list.sort.date">Tanggal</option>
+          <option value="name"    data-i18n="list.sort.name">Nama</option>
+          <option value="flight"  data-i18n="list.sort.flight">NO Pesawat</option>
+          <option value="updated" data-i18n="list.sort.updated">Terakhir diubah</option>
+        </select>
+      </label>
+      <button type="button" class="chip" id="resetBtn" data-i18n="list.reset">Hapus filter</button>
+      <button type="button" class="chip" id="reloadBtn" data-i18n="list.reload">Muat ulang</button>
+    </div>
+
+    <div id="result" aria-live="polite"></div>
+
+    <p class="loading-note" id="freshLine"></p>
+
+  </div>
+
+  <footer class="foot">
+    <div id="footInfo"></div>
+  </footer>
+
+</main>
+
+<script src="js/config.js?v=1.8"></script>
+<script src="js/i18n.js?v=1.8"></script>
+<script src="js/api.js?v=1.8"></script>
+<script src="js/admin-session.js?v=1.8"></script>
+<script src="js/admin-list.js?v=1.8"></script>
+
+</body>
+</html>
