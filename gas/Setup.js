@@ -727,17 +727,23 @@ function adoptOrphanWeekSheets_() {
     for (var k in SHEETS) { if (SHEETS[k] === name) return; }   // 固定分頁
     if (!looksLikeWeekSheet_(sheet)) return;
 
-    var last = sheet.getLastRow();
-    if (last < FIRST_DATA_ROW) return;                     // 還沒有資料，等有了再認養
+    // ⚠️ 每一張分頁各自包 try/catch。一張有問題的分頁（例如表頭少一欄，
+    //    buildColumnMap_ 會丟例外）不可以害其他分頁也認養不了。
+    try {
+      var last = sheet.getLastRow();
+      if (last < FIRST_DATA_ROW) return;                   // 還沒有資料，等有了再認養
 
-    var map = buildColumnMap_(sheet, MAIN_COLUMNS);
-    var dates = sheet.getRange(FIRST_DATA_ROW, map.tanggal, last - 1, 1).getValues();
-    var found = null;
-    for (var i = 0; i < dates.length && !found; i++) found = cellToDate_(dates[i][0]);
-    if (!found) return;                                    // 沒有任何一列有日期，無從判斷
+      var map = buildColumnMap_(sheet, MAIN_COLUMNS);
+      var dates = sheet.getRange(FIRST_DATA_ROW, map.tanggal, last - 1, 1).getValues();
+      var found = null;
+      for (var i = 0; i < dates.length && !found; i++) found = cellToDate_(dates[i][0]);
+      if (!found) return;                                  // 沒有任何一列有日期，無從判斷
 
-    sheet.addDeveloperMetadata('weekStart', isoDate_(weekStart_(found)));
-    adopted.push(name + ' → ' + weekSheetName_(found));
+      sheet.addDeveloperMetadata('weekStart', isoDate_(weekStart_(found)));
+      adopted.push(name + ' → ' + weekSheetName_(found));
+    } catch (e) {
+      logError_('adoptOrphanWeekSheets', '認養失敗', name + '：' + e.message);
+    }
   });
 
   if (adopted.length) {

@@ -40,7 +40,16 @@ function rebuildIndexIfDirty() {
   // ⚠️ 這一段要在「有沒有變更」的判斷**之前**跑。
   //    有人複製了一個分頁卻還沒編輯過時，旗標不會被立起來——
   //    只在有變更時才掃的話，那個孤兒分頁永遠不會被認養。
-  if (adoptOrphanWeekSheets_().length) markIndexDirty_();
+  //
+  // ⚠️ 而且一定要包 try/catch。認養只是一張安全網，
+  //    它自己出錯絕對不可以把「重建索引」這件主線任務一起拖垮——
+  //    排程死掉的樣子是「索引再也不更新」，而且完全沒有錯誤訊息，
+  //    你只會發現使用者查到的永遠是舊資料。
+  try {
+    if (adoptOrphanWeekSheets_().length) markIndexDirty_();
+  } catch (e) {
+    logError_('rebuildIndexIfDirty', '認養孤兒分頁失敗（不影響重建）', e.message);
+  }
 
   var props = PropertiesService.getScriptProperties();
   var dirty = props.getProperty(PROP_INDEX_DIRTY) === '1';
