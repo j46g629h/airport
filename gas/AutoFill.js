@@ -72,6 +72,42 @@ function onEdit(e) {
 }
 
 
+/**
+ * 結構變動（插入列、刪除列、插入/刪除欄）。
+ *
+ * ⚠️ **onEdit 對這些完全不會觸發。** Google 把它們歸類為另一種事件，
+ *    要用 onChange，而且 onChange **必須是安裝型觸發器**——
+ *    存檔不會讓它生效，一定要跑 installTriggers()。
+ *
+ * 少了這一支會出兩種事，兩種都不會報錯：
+ *
+ *   1. 在週分頁「右鍵 → 刪除列」→ 索引不知道 → 那筆已刪除的資料
+ *      **繼續出現在使用者的查詢結果裡**，直到 6 小時後的強制重建。
+ *   2. 在航班名冊刪掉重複的那一列 → 另一列的紅底標記留著，
+ *      你會去找一個已經解決的問題。
+ *
+ * ⚠️ onChange 不會告訴你改了哪一列，只知道「發生了什麼類型的變動」。
+ *    所以這裡的做法一律是「整個重算」，不做局部更新。
+ */
+function onSheetChange(e) {
+  try {
+    var type = e && e.changeType ? String(e.changeType) : '';
+    // 一般的儲存格編輯已經由 onEdit 處理過了，這裡只管結構變動
+    if (['INSERT_ROW', 'REMOVE_ROW', 'INSERT_COLUMN', 'REMOVE_COLUMN',
+         'INSERT_GRID', 'REMOVE_GRID'].indexOf(type) < 0) return;
+
+    // 插入或刪除列會改變資料內容 → 索引一定要重建
+    markIndexDirty_();
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    if (sheet && sheet.getName() === SHEETS.FLIGHT) markFlightDuplicates_(sheet);
+  } catch (err) {
+    logError_('onSheetChange', '處理結構變動失敗（' +
+              (e && e.changeType) + '）', err.message);
+  }
+}
+
+
 /* ══════════════════════════════════════════════════════════════
    週分頁
    ══════════════════════════════════════════════════════════════ */

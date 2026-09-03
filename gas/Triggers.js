@@ -12,21 +12,39 @@
  *    換電腦不用重裝；但換人安裝的話，舊的那組要先移除。
  */
 
-/** 這個專案要裝哪些排程。新增時加在這裡，然後重跑 installTriggers()。 */
+/** 這個專案要裝哪些觸發器。新增時加在這裡，然後重跑 installTriggers()。 */
 var TRIGGER_PLAN = [
   { fn: 'rebuildIndexIfDirty', every: 'minutes', n: 5,
     why: '有人改過才重建 _INDEX。沒改過就 0.1 秒結束——無條件重建會超出每日配額' },
   { fn: 'markPastAsDone', every: 'hours', n: 1,
     why: '把時間已經過去的「已排定」改成「已完成」，讓 Sheet 上的值跟使用者畫面一致' },
   { fn: 'ensureUpcomingWeekSheets', every: 'days', n: 1, hour: 3,
-    why: '建好本週與未來三週的分頁，讓人永遠不必手動建立（手動建的沒有標記，程式認不得）' }
+    why: '建好從今天起半年份的週分頁，讓人永遠不必手動建立（手動建的沒有標記，程式認不得）' },
+
+  /* ⚠️ 這一支不是時間排程，是「試算表結構變動」事件。
+     onEdit 對「插入列 / 刪除列」**完全不會觸發**——Google 把它們歸類為
+     另一種事件（onChange），而且 onChange **一定要安裝**，存檔不會讓它生效。
+
+     少了它會出兩種事，兩種都不會報錯：
+       1. 在週分頁「右鍵 → 刪除列」→ 索引不知道 → 那筆已刪除的資料
+          繼續出現在使用者的查詢結果裡，直到 6 小時後的強制重建
+       2. 在航班名冊刪掉重複的那一列 → 另一列的紅底標記留著 */
+  { fn: 'onSheetChange', event: 'change',
+    why: '接住插入列 / 刪除列（onEdit 對這些不會觸發），重建索引並更新航班重複標記' }
 ];
 
 
 function installTriggers() {
   removeTriggers();
 
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
   TRIGGER_PLAN.forEach(function (t) {
+    if (t.event === 'change') {
+      // 試算表事件觸發器，不是時間排程
+      ScriptApp.newTrigger(t.fn).forSpreadsheet(ss).onChange().create();
+      return;
+    }
     var b = ScriptApp.newTrigger(t.fn).timeBased();
     if (t.every === 'minutes')      b.everyMinutes(t.n);
     else if (t.every === 'hours')   b.everyHours(t.n);
@@ -35,9 +53,10 @@ function installTriggers() {
     b.create();
   });
 
-  var msg = '已安裝 ' + TRIGGER_PLAN.length + ' 個排程：\n  ' +
+  var msg = '已安裝 ' + TRIGGER_PLAN.length + ' 個觸發器：\n  ' +
             TRIGGER_PLAN.map(function (t) {
-              return t.fn + '（每 ' + t.n + ' ' + t.every + '）— ' + t.why;
+              var how = (t.event === 'change') ? '結構變動時' : ('每 ' + t.n + ' ' + t.every);
+              return t.fn + '（' + how + '）— ' + t.why;
             }).join('\n  ');
   Logger.log(msg);
   logInfo_('installTriggers', '排程重新安裝', msg);
