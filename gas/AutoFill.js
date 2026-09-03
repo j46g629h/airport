@@ -83,7 +83,7 @@ function onEdit(e) {
  *
  *   1. 在週分頁「右鍵 → 刪除列」→ 索引不知道 → 那筆已刪除的資料
  *      **繼續出現在使用者的查詢結果裡**，直到 6 小時後的強制重建。
- *   2. 在航班名冊刪掉重複的那一列 → 另一列的紅底標記留著，
+ *   2. 在名冊刪掉重複的那一列 → 另一列的紅底標記留著，
  *      你會去找一個已經解決的問題。
  *
  * ⚠️ onChange 不會告訴你改了哪一列，只知道「發生了什麼類型的變動」。
@@ -99,8 +99,12 @@ function onSheetChange(e) {
     // 插入或刪除列會改變資料內容 → 索引一定要重建
     markIndexDirty_();
 
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    if (sheet && sheet.getName() === SHEETS.FLIGHT) markFlightDuplicates_(sheet);
+    // ⚠️ 不去猜「使用者現在在哪一張分頁」。
+    //    onChange **不會告訴你改的是哪一張分頁**，getActiveSheet() 只是猜——
+    //    刪完列立刻切走、用 Ctrl+Z 復原、或另一台裝置同時操作時就會猜錯。
+    //    而猜錯的樣子是「刪掉重複的之後紅底一直留著」，沒有任何錯誤訊息。
+    //    兩份名冊加起來不到一百列，無條件重算的成本可以忽略。
+    refreshRosterMarks_();
   } catch (err) {
     logError_('onSheetChange', '處理結構變動失敗（' +
               (e && e.changeType) + '）', err.message);
@@ -418,7 +422,107 @@ function onEditPerson_(e, sheet) {
   } finally {
     lock.releaseLock();
   }
+
+  // ⚠️ 刻意放在鎖外面：標記只是重算格式，不改資料，不需要鎖。
+  //    兩個人同時編輯時各自算一次，算出來的結果一樣，沒有衝突。
+  markPersonDuplicates_(sheet);
 }
+
+
+/**
+ * 把重複的人標成紅底並加上註解；不重複的就把標記清掉。
+ * 跟航班名冊同一套做法（見 markFlightDuplicates_），只有「什麼算重複」不一樣。
+ *
+ * ⚠️ **不可以只看 email。** 眷屬與員工共用同一個 email 是**刻意的設計**
+ *    （設計約定第 6 條：linda.lim@pci.co.id 底下有三個人）。
+ *    只看 email 的話，會把整家人標成紅色——那不是重複，那是正常資料，
+ *    而且會讓這個提示立刻失去可信度。
+ *
+ * ⚠️ 標在**姓名**那一欄，不標 email。理由同上：email 重複是正常的，
+ *    在 email 上塗紅色會把人引導到錯的地方去看。
+ *
+ * ⚠️ 每次都重掃整欄，不是只看剛改的那幾列——
+ *    只標新的那一列的話，把重複的刪掉之後另一列的紅底會一直留著，
+ *    使用者會去找一個已經解決的問題（跟航班名冊同一個理由）。
+ */
+function markPersonDuplicates_(sheet) {
+  var last = sheet.getLastRow();
+  if (last < FIRST_DATA_ROW) return;
+
+  var iEmail = colIndexOf_(PERSON_COLUMNS, 'email');
+  var iName  = colIndexOf_(PERSON_COLUMNS, 'name');
+  var values = sheet.getRange(FIRST_DATA_ROW, 1, last - 1, PERSON_COLUMNS.length).getValues();
+
+  // 先數每個「email ＋ 姓名」各出現在哪幾列
+  var rowsOf = {};
+  values.forEach(function (r, i) {
+    var key = personKey_(r[iEmail - 1], r[iName - 1]);
+    if (!key) return;
+    (rowsOf[key] = rowsOf[key] || []).push(FIRST_DATA_ROW + i);
+  });
+
+  var backgrounds = [];
+  var notes = [];
+  values.forEach(function (r, i) {
+    var key = personKey_(r[iEmail - 1], r[iName - 1]);
+    var dup = key && rowsOf[key].length > 1;
+    backgrounds.push([dup ? '#FBEDEC' : null]);
+    notes.push([dup
+      ? '⚠️ 名冊重複\n' +
+        '同一個人也出現在第 ' +
+        rowsOf[key].filter(function (n) { return n !== FIRST_DATA_ROW + i; }).join('、') +
+        ' 列（email 與姓名都一樣）。\n\n' +
+        '同一個人建兩次的後果：\n' +
+        '· 改房號或停用時只會改到其中一筆，另一筆繼續生效\n' +
+        '· 兩筆的值一旦不一樣，輸入接送資料時那個欄位就會**安靜地不再自動帶入**\n\n' +
+        '請把多餘的那一列刪掉（歷史紀錄不會受影響）。'
+      : '']);
+  });
+
+  var range = sheet.getRange(FIRST_DATA_ROW, iName, last - 1, 1);
+  range.setBackgrounds(backgrounds);
+  range.setNotes(notes);
+}
+
+
+/**
+ * 名冊的「同一個人」怎麼認：email ＋ 姓名，**兩個都有值**才算。
+ *
+ * 只有其中一個的（打到一半的列）一律不判斷——
+ * 打字打到 email 那一格時，姓名還是空的，這時候標紅底只會嚇到人。
+ *
+ * 大小寫與多餘空白都正規化掉：'Mr  Kyle Ma' 跟 'mr kyle ma' 是同一個人。
+ */
+function personKey_(email, name) {
+  var e = str_(email).toLowerCase();
+  var n = str_(name).toLowerCase().replace(/\s+/g, ' ');
+  return (e && n) ? (e + '|' + n) : '';
+}
+
+
+/**
+ * 重算兩份名冊的重複標記。
+ * onChange（插入／刪除列）與 onOpen（開啟試算表）都呼叫它。
+ *
+ * ⚠️ 兩份各自包 try/catch：其中一份出錯（例如有人把表頭改壞了）
+ *    絕對不可以害另一份跟著不更新。
+ */
+function refreshRosterMarks_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  try {
+    var p = ss.getSheetByName(SHEETS.PERSON);
+    if (p) markPersonDuplicates_(p);
+  } catch (e) {
+    Logger.log('重算人員名冊重複標記失敗：' + e.message);
+  }
+  try {
+    var f = ss.getSheetByName(SHEETS.FLIGHT);
+    if (f) markFlightDuplicates_(f);
+  } catch (e) {
+    Logger.log('重算航班名冊重複標記失敗：' + e.message);
+  }
+}
+
 
 /**
  * 掃出目前最大的「前綴＋數字」編號再加一（P001 / K001 …）。
