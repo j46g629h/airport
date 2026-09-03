@@ -138,10 +138,14 @@ function checkData() {
     }
   });
 
+  checkPersonRoster_(ss, issues, stats);
+  checkFlightRoster_(ss, issues, stats, flights);
+
   // ── 輸出 ──
   var L = [];
   L.push('資料健檢　' + nowStampText_());
-  L.push('掃描 ' + stats.rows + ' 筆資料，' + stats.sheets + ' 個週分頁');
+  L.push('掃描 ' + stats.rows + ' 筆接送資料（' + stats.sheets + ' 個週分頁）、' +
+         (stats.persons || 0) + ' 筆人員名冊、' + (stats.flights || 0) + ' 筆航班名冊');
   L.push('');
 
   if (!issues.length) {
@@ -163,4 +167,153 @@ function checkData() {
   var out = L.join('\n');
   Logger.log(out);
   return out;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   名冊的檢查
+
+   ⚠️ 這裡特別檢查「型別」。從 Excel 貼過來時，Sheet 很容易把
+      5010070017 判斷成數字、502Z039000 判斷成文字——同一欄兩種型別，
+      篩選部門就會漏資料，而畫面上只有「靠左 / 靠右」的差別，
+      不特別看根本不會發現。
+   ══════════════════════════════════════════════════════════════ */
+
+/** 這一格是數字型別嗎（該是文字卻變成數字＝從 Excel 貼過來時被轉掉了） */
+function isNumericCell_(v) { return typeof v === 'number'; }
+
+
+function checkPersonRoster_(ss, issues, stats) {
+  var sheet = ss.getSheetByName(SHEETS.PERSON);
+  if (!sheet || sheet.getLastRow() < FIRST_DATA_ROW) return;
+
+  var map = buildColumnMap_(sheet, PERSON_COLUMNS);
+  var values = sheet.getRange(FIRST_DATA_ROW, 1, sheet.getLastRow() - 1,
+                              sheet.getLastColumn()).getValues();
+  var seen = {};
+  var n = 0;
+
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    var where = SHEETS.PERSON + ' 第 ' + (FIRST_DATA_ROW + i) + ' 列';
+    var email = str_(row[map.email - 1]).toLowerCase();
+    var name = str_(row[map.name - 1]);
+    if (!email && !name) continue;
+    n++;
+
+    if (!email) { issues.push(['🟡 名冊缺 email', where + '　' + name + '：沒有 email 就無法帶入，使用者也查不到']); }
+    else if (!looksLikeEmail_(email)) { issues.push(['🟡 名冊 email 格式怪', where + '：' + email]); }
+
+    if (!name) issues.push(['🟡 名冊缺英文姓名', where + '：' + email]);
+
+    if (!str_(row[map.person_id - 1]) && email && name) {
+      issues.push(['🟡 名冊缺 person_id', where + '　' + name + '：執行 backfillRosterIds() 補上']);
+    }
+
+    // ⚠️ email 可以重複（眷屬共用），但「同一個 email ＋ 同一個姓名」重複就是打了兩次
+    var key = email + '|' + name.toLowerCase();
+    if (seen[key]) issues.push(['🔴 名冊重複', where + '：' + name + ' / ' + email + ' 跟 ' + seen[key] + ' 完全一樣']);
+    else seen[key] = where;
+
+    if (isNumericCell_(row[map.dept - 1])) {
+      issues.push(['🟡 部門代碼變成數字', where + '　' + name +
+                   '：這一欄必須是文字。選取整欄 → 格式 → 數值 → 純文字，再重打一次']);
+    }
+    if (isNumericCell_(row[map.hp - 1])) {
+      issues.push(['🟡 手機號碼變成數字', where + '　' + name + '：開頭的 0 會不見。整欄設成純文字']);
+    }
+    if (isNumericCell_(row[map.dorm - 1])) {
+      issues.push(['🟡 房號變成數字', where + '　' + name + '：整欄設成純文字']);
+    }
+  }
+  stats.persons = n;
+}
+
+
+function checkFlightRoster_(ss, issues, stats, flightsSeen) {
+  var sheet = ss.getSheetByName(SHEETS.FLIGHT);
+  if (!sheet || sheet.getLastRow() < FIRST_DATA_ROW) return;
+
+  var map = buildColumnMap_(sheet, FLIGHT_COLUMNS);
+  var values = sheet.getRange(FIRST_DATA_ROW, 1, sheet.getLastRow() - 1,
+                              sheet.getLastColumn()).getValues();
+  var seen = {};
+  var n = 0;
+
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    var where = SHEETS.FLIGHT + ' 第 ' + (FIRST_DATA_ROW + i) + ' 列';
+    var raw = str_(row[map.flight - 1]);
+    if (!raw) continue;
+    n++;
+
+    var code = raw.replace(/\s+/g, '').toUpperCase();
+    if (code !== raw) {
+      issues.push(['🟡 航班號有空格或小寫', where + '：「' + raw + '」應為「' + code +
+                   '」。點一下那一格重打就會自動修正']);
+    }
+    if (seen[code]) issues.push(['🔴 航班號重複', where + '：' + code + ' 跟 ' + seen[code] + ' 撞號']);
+    else seen[code] = where;
+
+    var waktu = str_(row[map.waktu - 1]);
+    if (!waktu) {
+      issues.push(['🟡 航班缺時間', where + '：' + code + ' 沒有起降時間，輸入接送資料時不會自動帶入']);
+    } else if (!/^\d{1,2}:\d{2}$/.test(waktu)) {
+      issues.push(['🟡 航班時間格式不對', where + '：' + code + ' 的「' + waktu +
+                   '」不是 HH:MM。⚠️ 從 Excel 貼過來的時間常常會變成日期值']);
+    }
+    if (!str_(row[map.jenis - 1])) {
+      issues.push(['🔵 航班沒有標抵達/起飛', where + '：' + code]);
+    }
+  }
+  stats.flights = n;
+}
+
+
+/**
+ * 補上名冊缺的編號。
+ *
+ * 用途：一次貼超過 200 列時，onEdit 只處理得了前 200 列（那是為了
+ * 不超過 30 秒上限而設的保險），剩下的要靠這一支補。
+ * 重複執行是安全的——已經有編號的不會被動到。
+ */
+function backfillRosterIds() {
+  var out = [];
+  out.push(backfillOneRoster_(SHEETS.PERSON, PERSON_COLUMNS, 'person_id', 'P',
+                              ['email', 'name']));
+  out.push(backfillOneRoster_(SHEETS.VEHICLE, VEHICLE_COLUMNS, 'kendaraan_id', 'K',
+                              ['kendaraan']));
+  var msg = out.join('\n');
+  Logger.log(msg);
+  return msg;
+}
+
+
+function backfillOneRoster_(sheetName, columns, idCode, prefix, requiredCodes) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < FIRST_DATA_ROW) return sheetName + '：沒有資料';
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return sheetName + '：忙碌中，這次略過';
+
+  try {
+    var map = buildColumnMap_(sheet, columns);
+    var iId = map[idCode];
+    var values = sheet.getRange(FIRST_DATA_ROW, 1, sheet.getLastRow() - 1,
+                                sheet.getLastColumn()).getValues();
+    var next = nextSeqId_(sheet, iId - 1, prefix);
+    var filled = 0;
+
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+      var ready = requiredCodes.every(function (c) { return str_(row[map[c] - 1]) !== ''; });
+      if (!ready) continue;
+      if (str_(row[iId - 1])) continue;
+      setTextCell_(sheet, FIRST_DATA_ROW + i, iId, prefix + pad3_(next++));
+      filled++;
+    }
+    return sheetName + '：補上 ' + filled + ' 個編號';
+  } finally {
+    lock.releaseLock();
+  }
 }
