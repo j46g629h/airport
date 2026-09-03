@@ -879,15 +879,23 @@ function checkSetup() {
   L.push('【週分頁】');
   var weeks = ss.getSheets().filter(isWeekSheet_);
   if (!weeks.length) {
-    L.push('  （還沒有。執行 importBookings() 或 ensureNextWeekSheet() 之後才會出現）');
+    L.push('  （還沒有。執行 importBookings() 或 ensureUpcomingWeekSheets() 之後才會出現）');
   } else {
-    var total = 0;
+    var total = 0, ghostTotal = 0;
     weeks.forEach(function (sh) {
-      var rows = Math.max(sh.getLastRow() - 1, 0);
-      total += rows;
-      L.push('  ' + sh.getName() + '　' + rows + ' 筆');
+      var c = countMainRows_(sh);
+      total += c.data;
+      ghostTotal += c.ghost;
+      L.push('  ' + sh.getName() + '　' + c.data + ' 筆' +
+             (c.ghost ? '　⚠ 另有 ' + c.ghost + ' 列殘留' : ''));
     });
     L.push('  ── 合計 ' + total + ' 筆，' + weeks.length + ' 個分頁');
+    if (ghostTotal) {
+      L.push('');
+      L.push('  ⚠ 有 ' + ghostTotal + ' 列「殘留」：A~Q 欄是空的，但隱藏欄還留著東西。');
+      L.push('    通常是刪除資料時隱藏欄沒被一起清掉。它們不會進索引、不影響查詢，');
+      L.push('    但會讓列數看起來對不上。執行 cleanupGhostRows() 清乾淨。');
+    }
   }
 
   var imp = ss.getSheetByName(SHEETS.IMPORT);
@@ -898,4 +906,96 @@ function checkSetup() {
 
   Logger.log(L.join('\n'));
   return L.join('\n');
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   殘留列
+
+   ⚠️ 「殘留列」＝ A~Q 欄全空、但隱藏欄（STATUS、最後更新時間…）還有值的列。
+
+   怎麼產生的：把一列的資料刪掉時，如果 onEdit 沒有跑到
+   （例如當下搶不到鎖、或一次刪很多列超過單次處理上限），
+   隱藏欄就會留在那裡。
+
+   後果不嚴重——它們不會進索引、不影響查詢——但會讓
+   getLastRow() 算出來的列數比實際資料多，看起來像「索引漏了幾筆」，
+   而那會讓人開始懷疑整個系統，比問題本身糟糕得多。
+   ══════════════════════════════════════════════════════════════ */
+
+/** 數一張週分頁：data = A~Q 有內容的列，ghost = 只有隱藏欄有值的列 */
+function countMainRows_(sheet) {
+  var last = sheet.getLastRow();
+  if (last < FIRST_DATA_ROW) return { data: 0, ghost: 0 };
+
+  var values = sheet.getRange(FIRST_DATA_ROW, 1, last - 1, sheet.getLastColumn()).getValues();
+  var data = 0, ghost = 0;
+
+  values.forEach(function (row) {
+    var visible = false, hidden = false;
+    for (var c = 0; c < row.length; c++) {
+      if (String(row[c]).trim() === '') continue;
+      if (c < 17) visible = true;
+      else hidden = true;
+    }
+    if (visible) data++;
+    else if (hidden) ghost++;
+  });
+  return { data: data, ghost: ghost };
+}
+
+
+/**
+ * 清掉所有殘留列的隱藏欄。
+ *
+ * ⚠️ 只清「A~Q 全空」的那些列——只要 A~Q 有任何一格有值就完全不碰。
+ *    這條界線不可以放寬：清錯的是真實資料，救不回來。
+ *
+ * 只清內容、不刪列（刪列會讓下面的列號位移，雖然程式靠 booking_id 認資料
+ * 不受影響，但沒必要冒這個險）。
+ */
+function cleanupGhostRows() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return '另一個作業正在進行中，這次略過';
+
+  try {
+    var cleared = [];
+    SpreadsheetApp.getActiveSpreadsheet().getSheets().forEach(function (sheet) {
+      if (!isWeekSheet_(sheet)) return;
+      var last = sheet.getLastRow();
+      if (last < FIRST_DATA_ROW) return;
+
+      var width = sheet.getLastColumn();
+      var values = sheet.getRange(FIRST_DATA_ROW, 1, last - 1, width).getValues();
+
+      for (var i = 0; i < values.length; i++) {
+        var row = values[i];
+        var visible = false, hidden = false;
+        for (var c = 0; c < row.length; c++) {
+          if (String(row[c]).trim() === '') continue;
+          if (c < 17) { visible = true; break; }          // 有真實資料，立刻放棄這一列
+          hidden = true;
+        }
+        if (visible || !hidden) continue;
+
+        sheet.getRange(FIRST_DATA_ROW + i, 18, 1, Math.max(width - 17, 1)).clearContent();
+        cleared.push(sheet.getName() + ' 第 ' + (FIRST_DATA_ROW + i) + ' 列');
+      }
+    });
+
+    if (cleared.length) {
+      markIndexDirty_();
+      logInfo_('cleanupGhostRows', '清除殘留列', cleared.length + ' 列');
+    }
+
+    var out = ['清除 ' + cleared.length + ' 個殘留列' + (cleared.length ? '：' : '（沒有殘留）')];
+    cleared.slice(0, 40).forEach(function (x) { out.push('  ' + x); });
+    if (cleared.length > 40) out.push('  …（還有 ' + (cleared.length - 40) + ' 列）');
+
+    var msg = out.join(String.fromCharCode(10));
+    Logger.log(msg);
+    return msg;
+  } finally {
+    lock.releaseLock();
+  }
 }
