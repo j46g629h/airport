@@ -28,6 +28,7 @@ function onOpen(e) {
       .addItem('建立未來的週分頁', 'menuEnsureWeeks')
       .addItem('清除殘留列', 'menuCleanupGhostRows')
       .addItem('修復週分頁（認養 + 補格式）', 'menuRepairWeekSheets')
+      .addItem('重設名冊的重複標示', 'menuPersonHighlight')
       .addToUi();
   } catch (err) {
     Logger.log('建立選單失敗：' + err.message);
@@ -39,7 +40,11 @@ function onOpen(e) {
     Logger.log('自動跳到本週失敗：' + err.message);
   }
 
-  /* ── 自我修復：重算兩份名冊的重複標記 ──────────────────────
+  /* ── 自我修復：重算航班名冊的重複標記 ──────────────────────
+   *
+   * ⚠️ **人員名冊不在這裡。** 它的「中文姓名重複」改用 Google Sheet 內建的
+   *    條件式格式（gas/Setup.js 的 setupPersonHighlight_），那是 Sheet 自己
+   *    即時算的，不需要任何重算。下面整段講的是航班名冊。
    *
    * 紅底＋註解**是衍生資料**，跟 `_INDEX` 一樣：真相在資料欄裡，
    * 標記只是算出來的結果。衍生資料就該有一個「重算就好」的入口。
@@ -95,6 +100,16 @@ function menuRebuildIndex()      { showReport_('重建索引', rebuildIndex()); 
 function menuEnsureWeeks()       { showReport_('建立未來的週分頁', ensureUpcomingWeekSheets()); }
 function menuCleanupGhostRows()  { showReport_('清除殘留列', cleanupGhostRows()); }
 function menuRepairWeekSheets()  { showReport_('修復週分頁', repairWeekSheets()); }
+
+/**
+ * 重新套用「中文姓名重複 → 整列標黃」的條件式格式。
+ *
+ * 平常不必按——條件式格式設定一次就永遠有效，是 Google 自己在算的。
+ * 這個選單項目是給兩種情況用的：
+ *   1. 這個功能剛上線，還沒套用過
+ *   2. 有人不小心把那條規則刪掉了
+ */
+function menuPersonHighlight() { showReport_('重設名冊的重複標示', setupPersonHighlight_()); }
 
 
 /**

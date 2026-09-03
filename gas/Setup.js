@@ -70,6 +70,9 @@ function setupSheet() {
     }
   });
 
+  // ── 人員名冊：中文姓名重複時整列標黃（條件式格式）──
+  log.push(setupPersonHighlight_());
+
   log.push('· 公式參數分隔符號：「' + formulaSep_() + '」（依地區設定自動偵測）');
 
   if (SETUP_WARNINGS.length) {
@@ -86,6 +89,100 @@ function setupSheet() {
   log.push('  4. 執行 importBookings()');
   Logger.log(log.join('\n'));
   return log.join('\n');
+}
+
+
+/**
+ * 人員名冊：中文姓名重複時，整列標成淡黃底。
+ *
+ * ══ 為什麼用「條件式格式」而不是程式寫背景色 ═══════════════
+ *
+ * 這是這個專案第一個刻意「不寫程式」的功能，理由值得記下來：
+ *
+ * 程式寫背景色的話，顏色是**存進儲存格的屬性**，所以每次資料變動都得
+ * 重算一次並把「不再重複的」清掉。而「什麼時候重算」就是麻煩的來源——
+ * 要靠 onEdit（打字）、onChange（插入／刪除列，**安裝型觸發器**）、
+ * onOpen（開檔案）三條路去接。其中 onChange 有三種靜默失效的方式：
+ * 忘了跑 installTriggers()、換人安裝、Google 因授權變動停用它。
+ * 失效的樣子是「刪掉重複的那一列之後，另一列的顏色一直留著」——
+ * 使用者會去找一個已經解決的問題，然後開始不相信這個提示。
+ *
+ * 條件式格式是 Google **每次自己重新計算**的結果，不是存進去的格式。所以：
+ *   · 打完字立刻變色，不必等任何觸發器
+ *   · 刪掉重複的那一列，剩下那列的顏色當下就消失
+ *   · **「標記殘留」這種問題從根本不會發生**
+ *   · 不佔 Apps Script 的執行配額
+ *   · 唯讀身分開檔案也看得到
+ *
+ * 代價：條件式格式**做不到註解**，所以沒辦法告訴你「另一筆在第幾列」。
+ * 這個功能的目的是「整理名冊時一眼看出來」，看得到就夠了，可以接受。
+ * （航班名冊的紅底仍然用程式寫，因為那裡的註解要指出撞號的是第幾列。）
+ *
+ * ⚠️ 用黃色不用紅色：中文同名同姓在華人圈很常見，那可能真的是
+ *    兩個不同的人。紅色要留給「確定有問題」，濫用會讓紅色失去意義。
+ *
+ * ⚠️ 中文姓名**可以空白**（規格書：眷屬／訪客可空白），所以公式要先擋掉
+ *    空白格。不擋的話所有還沒填中文名的列會全部變黃，整張表都是顏色。
+ *
+ * ⚠️ 範圍寫成開放式的 A2:K（不指定結束列），以後名冊加到幾百人都自動涵蓋，
+ *    不必有人記得回來調範圍。
+ *
+ * ⚠️ 公式的參數分隔符號**跟地區設定有關**：en_US 用逗號、id_ID 用分號。
+ *    這個試算表是 id_ID，寫死逗號的公式會直接無效（而且不會報錯）。
+ *    formulaSep_() 會實際量一次，見 docs/部署筆記.md 的踩坑紀錄。
+ *
+ * 重複執行是安全的：每次都先把舊的同名規則清掉再重建。
+ */
+function setupPersonHighlight_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.PERSON);
+  if (!sheet) return '⚠ 找不到 ' + SHEETS.PERSON + '，略過中文姓名重複標示';
+
+  try {
+    var col = columnLetter_(colIndexOf_(PERSON_COLUMNS, 'nama_cina'));
+    var last = columnLetter_(PERSON_COLUMNS.length);
+    var S = formulaSep_();
+
+    // =AND($D2<>""; COUNTIF($D$2:$D; $D2)>1)
+    var formula = '=AND($' + col + '2<>""' + S +
+                  'COUNTIF($' + col + '$2:$' + col + S + '$' + col + '2)>1)';
+    var range = sheet.getRange('A2:' + last);
+
+    // ⚠️ 只清掉「套用在同一個範圍上」的舊規則，不要整張砍掉重來——
+    //    使用者自己加的條件式格式（例如把停用的人標灰）不可以被我們洗掉。
+    var kept = sheet.getConditionalFormatRules().filter(function (r) {
+      return !r.getRanges().some(function (x) { return x.getA1Notation() === range.getA1Notation(); });
+    });
+
+    kept.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(formula)
+      .setBackground(MARK_DUPE_NAME_BG)
+      .setRanges([range])
+      .build());
+
+    sheet.setConditionalFormatRules(kept);
+
+    // ⚠️ Google 會延後驗證公式，錯誤要等下一次寫入才爆，堆疊會指到不相干的地方。
+    //    立刻 flush，讓錯誤在這一行被接住（setupSheet() 踩過同一個坑）。
+    SpreadsheetApp.flush();
+
+    return '✓ ' + SHEETS.PERSON + ' 中文姓名重複 → 整列標黃（條件式格式，範圍 ' +
+           range.getA1Notation() + '）';
+  } catch (e) {
+    SETUP_WARNINGS.push(SHEETS.PERSON + ' 的中文姓名重複標示設定失敗：' + e.message);
+    return '⚠ 中文姓名重複標示設定失敗：' + e.message;
+  }
+}
+
+
+/** 欄號（1 起算）→ 欄名字母。1 → A、27 → AA */
+function columnLetter_(n) {
+  var s = '';
+  while (n > 0) {
+    var r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
 }
 
 

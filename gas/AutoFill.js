@@ -33,24 +33,20 @@
 var AUTOFILL_MAX_ROWS = 200;
 
 /**
- * 名冊上的三種底色。
+ * 名冊上「有問題」的底色。
  *
- * ⚠️ 三個顏色是三種意思，不可以混用——這是號誌燈，不是裝飾：
- *   🔴 紅 = 確定有問題，一定要處理
- *   🟡 黃 = 疑似有問題，請你看一眼；確認沒事就忽略它
- *   🔵 藍 = **不是問題**，只是把同一組的列標出來方便整理
+ * ⚠️ 顏色是號誌燈，不是裝飾。**紅色只留給「確定有問題、一定要處理」**——
+ *    拿紅色去標正常資料的話，看幾次之後管理者就會開始忽略所有紅色，
+ *    真正該處理的那幾筆也會跟著被忽略。紅燈只有在稀少時才有用。
  *
- * ⚠️ 藍色那一類最容易被寫成紅色，但那是錯的：
- *    眷屬與員工共用一個 email 是刻意的設計（設計約定第 6 條），
- *    用紅色標正常資料，看幾次之後管理者就會開始忽略所有紅色，
- *    真正該處理的那幾筆也會跟著被忽略。號誌燈只有在紅燈稀少時才有用。
+ *    所以人員名冊的「中文姓名重複」用黃色不用紅色：中文同名同姓
+ *    在華人圈很常見，那可能真的是兩個不同的人，只是請管理者看一眼。
  *
- * 色碼跟前端 css/style.css 的 --danger-bg / --warn-bg / --info-bg 同一組，
+ * 色碼跟前端 css/style.css 的 --danger-bg / --warn-bg 同一組，
  * 這樣試算表跟網頁用同一套視覺語言。
  */
-var MARK_DUP_BG  = '#FBEDEC';   // 紅：確定重複
-var MARK_TYPO_BG = '#FBF2E3';   // 黃：疑似打錯字
-var MARK_GROUP_BG = '#E8F0FA';  // 藍：同一個 email 的一組人（資訊，不是錯誤）
+var MARK_DUP_BG = '#FBEDEC';        // 🔴 航班號撞號（自動帶入時不知道要用哪一個）
+var MARK_DUPE_NAME_BG = '#FBF2E3';  // 🟡 中文姓名重複，整列（條件式格式用）
 
 /**
  * 依名冊自動帶入的欄位。**清除時也是清這一份清單，兩邊必須是同一份。**
@@ -443,241 +439,24 @@ function onEditPerson_(e, sheet) {
     lock.releaseLock();
   }
 
-  // ⚠️ 刻意放在鎖外面：標記只是重算格式，不改資料，不需要鎖。
-  //    兩個人同時編輯時各自算一次，算出來的結果一樣，沒有衝突。
-  markPersonDuplicates_(sheet);
 }
 
 
 /**
- * 人員名冊的問題標記。兩層，用顏色區分嚴重度：
- *
- *   🔴 紅底　email ＋ 姓名**完全一樣** → 確定是同一個人建了兩次
- *   🟡 黃底　同一個 email 底下，姓名只差一兩個字母 → 疑似打成兩種拼法
- *
- * 沒問題的就把標記清掉，所以刪掉重複的那一列之後，殘留的標記會自己消失。
- * 跟航班名冊同一套做法（見 markFlightDuplicates_），只有「什麼算重複」不一樣。
- *
- * ⚠️ **不可以只看 email。** 眷屬與員工共用同一個 email 是**刻意的設計**
- *    （設計約定第 6 條：linda.lim@pci.co.id 底下有三個人）。
- *    只看 email 的話，會把整家人標成紅色——那不是重複，那是正常資料，
- *    而且會讓這個提示立刻失去可信度。
- *
- * ⚠️ 標在**姓名**那一欄，不標 email。理由同上：email 重複是正常的，
- *    在 email 上塗紅色會把人引導到錯的地方去看。
- *
- * ⚠️ 每次都重掃整欄，不是只看剛改的那幾列——
- *    只標新的那一列的話，把重複的刪掉之後另一列的紅底會一直留著，
- *    使用者會去找一個已經解決的問題（跟航班名冊同一個理由）。
- */
-function markPersonDuplicates_(sheet) {
-  var last = sheet.getLastRow();
-  if (last < FIRST_DATA_ROW) return;
-
-  // ⚠️ 用 buildColumnMap_ 讀 Sheet 上**實際的表頭位置**，不可以用欄位定義的順序。
-  //    有人插入或搬動欄位之後，順序就不是定義的順序了——照順序讀會整批
-  //    錯位讀到隔壁欄，而且完全不會報錯（gas/Utils.js 檔頭的警告）。
-  var map = buildColumnMap_(sheet, PERSON_COLUMNS);
-  var iEmail = map.email, iName = map.name;
-  var values = sheet.getRange(FIRST_DATA_ROW, 1, last - 1, sheet.getLastColumn()).getValues();
-
-  // 每一列先算出正規化的 email 與姓名（大小寫、多餘空白都壓掉）
-  var rows = values.map(function (r, i) {
-    return {
-      row:   FIRST_DATA_ROW + i,
-      email: str_(r[iEmail - 1]).toLowerCase(),
-      name:  str_(r[iName - 1]).toLowerCase().replace(/\s+/g, ' ')
-    };
-  });
-
-  // ⚠️ 依 email 分組時**只要 email 有值就算**，不管姓名打了沒有。
-  //    「同一個 email 出現在哪幾列」這件事跟姓名無關，
-  //    要求姓名也填好的話，剛貼上一批還沒補完的資料就標不出來。
-  var byEmail = {};
-  rows.forEach(function (o) {
-    if (!o.email) return;
-    (byEmail[o.email] = byEmail[o.email] || []).push(o);
-  });
-
-  markEmailGroups_(sheet, rows, byEmail, iEmail, last);
-  markSamePerson_(sheet, rows, byEmail, iName, last);
-}
-
-
-/**
- * 【email 欄】同一個 email 出現在兩列以上 → 淡藍底 ＋ 註解列出同組的列號。
- *
- * ⚠️ 這是**資訊，不是錯誤**，所以刻意不用紅色。
- *    眷屬與員工共用一個信箱是這個系統刻意的設計（設計約定第 6 條）——
- *    用紅色標正常資料，看幾次之後管理者就會開始忽略所有紅色，
- *    真正該處理的那幾筆也會跟著被忽略。號誌燈只有在紅燈稀少時才有用。
- *
- * 用途純粹是整理名冊時「一眼看出哪幾列是同一組人」。
- */
-function markEmailGroups_(sheet, rows, byEmail, iEmail, last) {
-  var backgrounds = [], notes = [];
-
-  rows.forEach(function (o) {
-    var g = o.email ? byEmail[o.email] : null;
-    if (!g || g.length < 2) { backgrounds.push([null]); notes.push(['']); return; }
-
-    var others = g.filter(function (x) { return x.row !== o.row; })
-                  .map(function (x) { return x.row; });
-    backgrounds.push([MARK_GROUP_BG]);
-    notes.push(['👥 這個 email 有 ' + g.length + ' 個人共用\n' +
-      '另外幾列：第 ' + others.join('、') + ' 列\n\n' +
-      '眷屬與員工共用同一個信箱是正常的，這個顏色只是讓你整理名冊時\n' +
-      '一眼看出哪幾列是同一組，不影響任何功能。\n\n' +
-      '⚠️ 但同一組裡的**房號要各自填各自的**，不可以互相抄——\n' +
-      '實際資料裡一家三口住 R6-1 / R6-2 / R6-3 三間不同的房。']);
-  });
-
-  var range = sheet.getRange(FIRST_DATA_ROW, iEmail, last - 1, 1);
-  range.setBackgrounds(backgrounds);
-  range.setNotes(notes);
-}
-
-
-/**
- * 【姓名欄】真正的錯誤：同一個人被建了兩次。
- *
- *   🔴 紅底　email ＋ 姓名**完全一樣** → 確定重複
- *   🟡 黃底　同一個 email 底下，姓名只差一兩個字母 → 疑似打成兩種拼法
- *
- * ⚠️ 跟 email 欄的淡藍是**兩件事**，所以標在不同欄位：
- *    藍色在 email 欄說「這幾列是同一組」；紅黃在姓名欄說「這一列有問題」。
- *    同一格塗兩種意思的顏色，看的人分不出來在講什麼。
- */
-function markSamePerson_(sheet, rows, byEmail, iName, last) {
-  // 第一層：email ＋ 姓名完全一樣
-  var sameRows = {};
-  rows.forEach(function (o) {
-    if (!o.email || !o.name) return;
-    var k = o.email + '|' + o.name;
-    (sameRows[k] = sameRows[k] || []).push(o.row);
-  });
-
-  // 第二層：同一個 email 底下，姓名很像但不一樣（疑似打錯字）
-  var typoRows = {};
-  Object.keys(byEmail).forEach(function (e) {
-    var g = byEmail[e].filter(function (x) { return x.name; });   // 姓名還沒打的不比
-    for (var i = 0; i < g.length; i++) {
-      for (var j = i + 1; j < g.length; j++) {
-        if (!looksLikeTypo_(g[i].name, g[j].name)) continue;
-        (typoRows[g[i].row] = typoRows[g[i].row] || []).push(g[j].row);
-        (typoRows[g[j].row] = typoRows[g[j].row] || []).push(g[i].row);
-      }
-    }
-  });
-
-  var backgrounds = [], notes = [];
-  rows.forEach(function (o) {
-    var key = (o.email && o.name) ? (o.email + '|' + o.name) : '';
-    var dupWith = key && sameRows[key].length > 1
-      ? sameRows[key].filter(function (n) { return n !== o.row; }) : null;
-    // ⚠️ 確定重複優先。同時符合兩者時顯示紅色——
-    //    「確定要處理」比「請你確認一下」嚴重，不可以被蓋掉。
-    var typoWith = !dupWith ? typoRows[o.row] : null;
-
-    if (dupWith) {
-      backgrounds.push([MARK_DUP_BG]);
-      notes.push(['⚠️ 同一個人建了兩次\n' +
-        '第 ' + dupWith.join('、') + ' 列的 email 與姓名跟這一列完全一樣。\n\n' +
-        '後果：\n' +
-        '· 改房號或停用時只會改到其中一筆，另一筆繼續生效\n' +
-        '· 兩筆的值一旦不一樣，輸入接送資料時那個欄位就會安靜地不再自動帶入\n\n' +
-        '請把多餘的那一列刪掉（歷史紀錄不會受影響）。']);
-    } else if (typoWith) {
-      backgrounds.push([MARK_TYPO_BG]);
-      notes.push(['❓ 疑似打錯字\n' +
-        '第 ' + typoWith.join('、') + ' 列有一個「同一個 email、姓名只差一兩個字母」的人。\n\n' +
-        '常見的情況是同一個人被打成兩種拼法（例如 Fankie / Frankie）。\n' +
-        '是的話請把錯的那一列刪掉。\n\n' +
-        '如果確實是兩個不同的人（例如兄弟名字很像），忽略這個提示就好，\n' +
-        '它不影響任何功能。']);
-    } else {
-      backgrounds.push([null]);
-      notes.push(['']);
-    }
-  });
-
-  var range = sheet.getRange(FIRST_DATA_ROW, iName, last - 1, 1);
-  range.setBackgrounds(backgrounds);
-  range.setNotes(notes);
-}
-
-
-/**
- * 同一個 email 底下的兩個姓名，像不像是「同一個人被打成兩種拼法」。
- *
- * 門檻刻意訂得保守，因為**誤報的代價比漏抓高**：
- * 標了一個其實沒問題的，管理者第二次看到就會開始無視所有黃底，
- * 那等於把這個功能整個廢掉。漏抓的話還有每日資料健檢當第二道。
- *
- *   差 1 個字母 → 姓名至少 10 個字（Fankie / Frankie 差 1，長度 13~14）
- *   差 2 個字母 → 姓名至少 14 個字（短名字差兩個字，通常真的是兩個人）
- *
- * ⚠️ 太短的名字一律不判斷。'Mr A Lin' 跟 'Mr B Lin' 也只差一個字母，
- *    但那顯然是兩個人——短字串的「差一個字母」不代表任何東西。
- */
-function looksLikeTypo_(a, b) {
-  if (a === b) return false;                              // 完全一樣走紅底那條，不是這裡的事
-  var maxLen = Math.max(a.length, b.length);
-  if (maxLen < 10) return false;
-  if (Math.abs(a.length - b.length) > 2) return false;    // 早退，省掉大部分的計算
-  var d = editDistance_(a, b);
-  if (d === 1) return true;                               // 上面已經擋掉 maxLen < 10
-  if (d === 2) return maxLen >= 14;
-  return false;
-}
-
-
-/**
- * 編輯距離（Levenshtein）：把 a 改成 b 最少要幾次「增／刪／改一個字」。
- *
- * 只用在同一個 email 底下的姓名比對，字串都很短（十幾個字）、
- * 一個 email 通常只有 2~4 個人，所以成本可以忽略。
- * 只保留兩列而不是整張表，記憶體是 O(較短的那個字串)。
- */
-function editDistance_(a, b) {
-  var la = a.length, lb = b.length;
-  if (!la) return lb;
-  if (!lb) return la;
-
-  var prev = [], cur = [], j;
-  for (j = 0; j <= lb; j++) prev[j] = j;
-
-  for (var i = 1; i <= la; i++) {
-    cur[0] = i;
-    for (j = 1; j <= lb; j++) {
-      var cost = (a.charAt(i - 1) === b.charAt(j - 1)) ? 0 : 1;
-      cur[j] = Math.min(cur[j - 1] + 1,        // 插入
-                        prev[j] + 1,           // 刪除
-                        prev[j - 1] + cost);   // 取代
-    }
-    prev = cur.slice();
-  }
-  return prev[lb];
-}
-
-
-/**
- * 重算兩份名冊的重複標記。
+ * 重算航班名冊的重複標記。
  * onChange（插入／刪除列）與 onOpen（開啟試算表）都呼叫它。
  *
- * ⚠️ 兩份各自包 try/catch：其中一份出錯（例如有人把表頭改壞了）
- *    絕對不可以害另一份跟著不更新。
+ * ⚠️ **人員名冊不在這裡。** 它的「中文姓名重複」改用 Google Sheet 內建的
+ *    條件式格式（見 gas/Setup.js 的 setupPersonHighlight_）——那是 Sheet 自己
+ *    即時算出來的，不是程式寫進去的格式，所以：打完字立刻變色、刪掉重複的
+ *    立刻復原、不必等觸發器、也不可能有「標記殘留」。
+ *
+ *    航班名冊還留在這裡，是因為它要在註解裡寫出「另一筆在第幾列」，
+ *    而條件式格式做不到註解。
  */
 function refreshRosterMarks_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
-    var p = ss.getSheetByName(SHEETS.PERSON);
-    if (p) markPersonDuplicates_(p);
-  } catch (e) {
-    Logger.log('重算人員名冊重複標記失敗：' + e.message);
-  }
-  try {
-    var f = ss.getSheetByName(SHEETS.FLIGHT);
+    var f = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.FLIGHT);
     if (f) markFlightDuplicates_(f);
   } catch (e) {
     Logger.log('重算航班名冊重複標記失敗：' + e.message);
