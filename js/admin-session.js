@@ -86,3 +86,30 @@ async function requireLogin() {
     return getProfile();
   }
 }
+
+
+/**
+ * 後端回來的錯誤代碼 → 使用者看得懂的話。
+ *
+ * ⚠️ 放在這裡（而不是各頁自己一份）是因為登入頁和帳號管理頁都要用。
+ *    複製兩份的結果一定是其中一份漏掉新的錯誤代碼，
+ *    使用者就會看到「系統出了問題」這種毫無幫助的訊息。
+ */
+function tAdminError(res) {
+  const code = res && res.error;
+  const detail = res && res.message;
+  switch (code) {
+    case 'LOGIN_REQUIRED':      return t('adm.err.required');
+    case 'LOGIN_FAILED':        return t('adm.err.failed', { n: detail || 0 });
+    case 'LOGIN_LOCKED':        return t('adm.err.locked', { n: detail || 15 });
+    case 'ACCOUNT_DISABLED':    return t('adm.err.disabled');
+    case 'ACCOUNT_NOT_FOUND':   return t('adm.err.disabled');
+    case 'UNAUTHORIZED':        return t('adm.err.expired');
+    case 'FORBIDDEN':           return t('adm.err.forbidden');
+    case 'PASSWORD_REQUIRED':   return t('adm.err.required');
+    case 'PASSWORD_TOO_SHORT':  return t('adm.err.tooShort', { n: detail || 8 });
+    case 'PASSWORD_SAME':       return t('adm.err.same');
+    case 'OLD_PASSWORD_WRONG':  return t('adm.err.oldWrong');
+    default:                    return t('err.server');
+  }
+}

@@ -136,6 +136,8 @@ function showPanel(name) {
     document.getElementById('doneAccount').textContent = p.account || '';
     document.getElementById('doneRole').textContent =
       t(p.is_super ? 'adm.role.super' : 'adm.role.admin');
+    // 帳號管理只有超管進得去（後端 withAuth(..., true) 會擋，這裡只是不要讓人白點）
+    document.getElementById('adminNav').hidden = !p.is_super;
   }
   showMsg('', '');
 }
@@ -165,26 +167,5 @@ async function withBusy(btnId, labelKey, fn) {
   } finally {
     btn.disabled = false;
     btn.textContent = t(labelKey);
-  }
-}
-
-
-/** 後端回來的錯誤代碼 → 使用者看得懂的話 */
-function tAdminError(res) {
-  const code = res && res.error;
-  const detail = res && res.message;
-  switch (code) {
-    case 'LOGIN_REQUIRED':      return t('adm.err.required');
-    case 'LOGIN_FAILED':        return t('adm.err.failed', { n: detail || 0 });
-    case 'LOGIN_LOCKED':        return t('adm.err.locked', { n: detail || 15 });
-    case 'ACCOUNT_DISABLED':    return t('adm.err.disabled');
-    case 'ACCOUNT_NOT_FOUND':   return t('adm.err.disabled');
-    case 'UNAUTHORIZED':        return t('adm.err.expired');
-    case 'FORBIDDEN':           return t('adm.err.forbidden');
-    case 'PASSWORD_REQUIRED':   return t('adm.err.required');
-    case 'PASSWORD_TOO_SHORT':  return t('adm.err.tooShort', { n: detail || 8 });
-    case 'PASSWORD_SAME':       return t('adm.err.same');
-    case 'OLD_PASSWORD_WRONG':  return t('adm.err.oldWrong');
-    default:                    return t('err.server');
   }
 }

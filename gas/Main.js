@@ -36,7 +36,10 @@ var ROUTES = {
 
   // ── 需要登入 ──
   getAdminProfile:     function (p) { return withAuth(p, function (s) { return getAdminProfile(p, s); }); },
-  adminChangePassword: function (p) { return withAuth(p, function (s) { return adminChangePassword(p, s); }); }
+  adminChangePassword: function (p) { return withAuth(p, function (s) { return adminChangePassword(p, s); }); },
+
+  // ── 只有 SUPER ──（第三個參數 true）
+  manageAdmin: function (p) { return withAuth(p, function (s) { return manageAdmin(p, s); }, true); }
 };
 
 

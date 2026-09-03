@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Kelola Akun — Antar Jemput Bandara</title>
+<link rel="stylesheet" href="css/style.css?v=0.9">
+</head>
+<body>
+
+<!--
+  只有超級管理者看得到這一頁。
+  ⚠️ 前端把不能按的按鈕變灰只是體驗，真正的把關在 gas/Admins.js——
+     任何人都能繞過前端直接打 API。
+-->
+
+<header class="topbar">
+  <a class="backbtn" href="admin.html">
+    <span aria-hidden="true">←</span>
+    <span data-i18n="acc.back">Admin</span>
+  </a>
+  <span class="brand" data-i18n="acc.title">Kelola Akun</span>
+  <nav class="lang" aria-label="Language">
+    <button type="button" data-lang="id" aria-pressed="true">ID</button>
+    <button type="button" data-lang="zh" aria-pressed="false">中</button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <div id="adminMsg" role="alert" hidden></div>
+
+  <div id="content" hidden>
+
+    <!-- 新增帳號後顯示的初始密碼。⚠️ 只會出現這一次 -->
+    <div id="pwBox" class="card pwbox" hidden>
+      <h2 data-i18n="acc.pw.title">Kata Sandi Awal</h2>
+      <dl class="kv">
+        <dt data-i18n="adm.account">Akun</dt><dd id="pwAccount"></dd>
+        <dt data-i18n="acc.pw.value">Kata sandi</dt><dd><code id="pwValue" class="pwcode"></code></dd>
+      </dl>
+      <p class="warn-line" data-i18n="acc.pw.once"></p>
+    </div>
+
+    <div class="rowbar">
+      <h1 data-i18n="acc.title">Kelola Akun</h1>
+      <button type="button" class="chip chip--main" id="toggleCreate" data-i18n="acc.create.toggle">+ Akun baru</button>
+    </div>
+
+    <!-- 新增帳號 -->
+    <section id="createBox" class="card card--lift" hidden>
+      <form id="createForm">
+        <div class="field">
+          <label for="newAccount" data-i18n="acc.new.account">Akun (email)</label>
+          <input type="text" id="newAccount" inputmode="email" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="newName" data-i18n="acc.new.name">Nama</label>
+          <input type="text" id="newName">
+        </div>
+        <div class="field">
+          <label for="newRole" data-i18n="acc.new.role">Peran</label>
+          <select id="newRole">
+            <option value="ADMIN" data-i18n="adm.role.admin">Admin</option>
+            <option value="SUPER" data-i18n="adm.role.super">Super Admin</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="newEmailNotif" data-i18n="acc.new.emailNotif">Email notifikasi</label>
+          <input type="text" id="newEmailNotif" inputmode="email" autocapitalize="off" spellcheck="false">
+          <div class="hint" data-i18n="acc.new.emailNotifHint"></div>
+        </div>
+        <button type="submit" class="btn" id="createBtn" data-i18n="acc.create.submit">Buat akun</button>
+      </form>
+    </section>
+
+    <div id="list"></div>
+
+    <p class="hint" data-i18n="acc.noPasswordNote"></p>
+
+    <button type="button" class="btn btn--quiet" id="logoutBtn" data-i18n="adm.logout">Keluar</button>
+  </div>
+
+  <footer class="foot">
+    <div id="footInfo"></div>
+  </footer>
+
+</main>
+
+<script src="js/config.js?v=0.9"></script>
+<script src="js/i18n.js?v=0.9"></script>
+<script src="js/api.js?v=0.9"></script>
+<script src="js/admin-session.js?v=0.9"></script>
+<script src="js/admin-accounts.js?v=0.9"></script>
+
+</body>
+</html>

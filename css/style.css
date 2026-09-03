@@ -436,6 +436,93 @@ a { color: var(--action); }
 }
 
 
+/* ===== 帳號管理 ===== */
+
+/* 標題與「新增帳號」並排 */
+.rowbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  margin-bottom: var(--gap);
+}
+.rowbar h1 { margin: 0; margin-right: auto; }
+
+select {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 10px 12px;
+  font-size: var(--fs-input);
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+}
+
+/* 卡片上的操作按鈕。⚠️ 高度給滿 --tap-min，戴手套也點得到 */
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.chip {
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chip:active { background: var(--surface-alt); }
+
+/* 停用中的按鈕：不要淡到看不見，使用者要看得懂「為什麼不能按」
+   （滑鼠移上去有 title 說明原因） */
+.chip[disabled] {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.chip--main   { background: var(--action); border-color: var(--action); color: #fff; font-weight: 600; }
+.chip--danger { color: var(--danger); border-color: var(--danger-border); background: var(--danger-bg); }
+
+.badge--role { color: var(--text-muted); background: var(--surface-alt); border-color: var(--border-strong); }
+
+/* 初始密碼的區塊：這組密碼只會出現一次，要夠明顯 */
+.pwbox {
+  border: 2px solid var(--ok-border);
+  background: var(--ok-bg);
+}
+.pwbox h2 { color: var(--ok); }
+
+.pwcode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: .08em;
+  user-select: all;               /* 點一下就能整段選起來複製 */
+  background: #fff;
+  border: 1px solid var(--ok-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+}
+
+.warn-line {
+  margin: 12px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+
 /* ===== 狀態訊息 ===== */
 
 .msg {

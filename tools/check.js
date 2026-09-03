@@ -65,23 +65,54 @@ function checkSyntax() {
 
 /* ── 2. 重複的函式名稱 ──────────────────────────────────── */
 
+function topLevelFunctions(file) {
+  const names = [];
+  const re = /^function\s+([A-Za-z0-9_$]+)/gm;
+  let m;
+  const src = read(file);
+  while ((m = re.exec(src)) !== null) names.push(m[1]);
+  return names;
+}
+
 function checkDuplicateFunctions() {
+  // ── 後端：Apps Script 把所有檔案當成同一份程式 ──
   const seen = {};
   const dups = [];
   listJs('gas').forEach(f => {
-    const src = read(f);
-    const re = /^function\s+([A-Za-z0-9_$]+)/gm;
-    let m;
-    while ((m = re.exec(src)) !== null) {
-      const name = m[1];
+    topLevelFunctions(f).forEach(name => {
       if (seen[name]) dups.push(name + '（' + seen[name] + ' 與 ' + f + '）');
       else seen[name] = f;
-    }
+    });
   });
   if (dups.length) {
     fail('後端有重複的函式名稱（後面的會無聲蓋掉前面的）：\n      ' + dups.join('\n      '));
   } else {
     ok('後端沒有重複的函式名稱（共 ' + Object.keys(seen).length + ' 支）');
+  }
+
+  // ── 前端：同一頁載入的那幾支也共用同一個全域範圍 ──
+  //
+  // ⚠️ 不能像後端那樣全部一起比：js/query.js 和 js/admin-accounts.js
+  //    各自有一支 esc()，但它們**永遠不會出現在同一頁**，那不是問題。
+  //    所以要「依每個 HTML 實際載入了哪幾支」分別檢查。
+  //    真的撞名的話，後載入的那一支會無聲蓋掉前一支——
+  //    畫面不會壞，只是行為變成另一支的，這種 bug 極難查。
+  const pageDups = [];
+  fs.readdirSync(ROOT).filter(f => f.endsWith('.html')).forEach(html => {
+    const srcs = [...read(html).matchAll(/<script\s+src="(js\/[^"?]+)/g)].map(m => m[1]);
+    const pageSeen = {};
+    srcs.forEach(f => {
+      if (!fs.existsSync(path.join(ROOT, f))) { fail(html + ' 引用了不存在的檔案：' + f); return; }
+      topLevelFunctions(f).forEach(name => {
+        if (pageSeen[name]) pageDups.push(html + '：' + name + '（' + pageSeen[name] + ' 與 ' + f + '）');
+        else pageSeen[name] = f;
+      });
+    });
+  });
+  if (pageDups.length) {
+    fail('同一頁載入的前端檔案有重複的函式名稱：\n      ' + pageDups.join('\n      '));
+  } else {
+    ok('每個頁面載入的前端檔案都沒有撞名');
   }
 }
 
