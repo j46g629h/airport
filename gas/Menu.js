@@ -29,6 +29,7 @@ function onOpen(e) {
       .addItem('清除殘留列', 'menuCleanupGhostRows')
       .addItem('修復週分頁（認養 + 補格式）', 'menuRepairWeekSheets')
       .addItem('重設名冊的重複標示', 'menuPersonHighlight')
+      .addItem('整理人員名冊欄位（移除退役欄）', 'menuTidyPersonColumns')
       .addToUi();
   } catch (err) {
     Logger.log('建立選單失敗：' + err.message);
@@ -110,6 +111,25 @@ function menuRepairWeekSheets()  { showReport_('修復週分頁', repairWeekShee
  *   2. 有人不小心把那條規則刪掉了
  */
 function menuPersonHighlight() { showReport_('重設名冊的重複標示', setupPersonHighlight_()); }
+
+/**
+ * 把人員名冊上已經退役的欄位刪掉，然後重套整列標黃的規則。
+ *
+ * ⚠️ 兩件事一定要一起做，所以放在同一個選單項目裡：
+ *    整列標黃的範圍是從 PERSON_COLUMNS.length 算出來的（少一欄 → A2:K 變 A2:J）。
+ *    只刪欄不重套，最右邊會多黃一欄；只重套不刪欄，那一欄還在。
+ *
+ * ⚠️ 用選單而不是叫人自己在 Sheet 上右鍵刪欄：程式是**按表頭名稱**找欄的，
+ *    不可能刪到隔壁那一欄。手動刪欄刪錯一格就是真的資料不見了。
+ *
+ * 重複按是安全的：欄已經刪掉之後第二次是空轉，規則也只是重套一次。
+ */
+function menuTidyPersonColumns() {
+  var lines = [];
+  lines.push(dropRetiredPersonColumns_());
+  lines.push(setupPersonHighlight_());
+  showReport_('整理人員名冊欄位', lines.join('\n'));
+}
 
 
 /**

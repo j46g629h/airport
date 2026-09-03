@@ -334,12 +334,15 @@ def write_persons(rows):
 
     with open_csv(os.path.join(OUT, '人員名冊_初版.csv')) as f:
         w = csv.writer(f)
+        # ⚠️ 欄位順序必須跟 gas/Config.js 的 PERSON_COLUMNS 一模一樣。
+        #    匯入是「照位置貼」的，這裡多一欄少一欄，整排就位移。
+        #    v2.3 已移除『EMAIL NOTIFIKASI 通知信箱』。
         w.writerow(['person_id', 'EMAIL 電子郵件', 'NAME 英文姓名', 'NAMA CINA 中文姓名',
                     'DEPT 部門代碼', 'FACTORY 廠別', 'DORM 房間號碼', 'HP 手機號碼',
-                    'TIPE 身分別', 'EMAIL NOTIFIKASI 通知信箱', 'AKTIF 啟用'])
+                    'TIPE 身分別', 'AKTIF 啟用'])
         for p in out:
             w.writerow([p['pid'], p['email'], p['name'], p['cn'], p['dept'], p['fac'],
-                        p['dorm'], p['hp'], p['tipe'], '', 'Ya 是'])
+                        p['dorm'], p['hp'], p['tipe'], 'Ya 是'])
     return out
 
 

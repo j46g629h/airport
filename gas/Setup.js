@@ -36,6 +36,12 @@ function setupSheet() {
     log.push('⚠ 地區/時區設定失敗，請手動到「檔案 → 設定」設成 Indonesia / (GMT+07:00) Jakarta：' + e.message);
   }
 
+  /* ── 先清掉退役欄位，再套結構。順序不可以顛倒 ──
+     applyStructure_() 的表頭是按位置寫的：定義少一欄、表上那一欄還在的話，
+     會蓋出兩個同名的「AKTIF 啟用」欄，然後停用功能會安靜失效。
+     詳見 dropRetiredPersonColumns_() 的說明。 */
+  log.push(dropRetiredPersonColumns_());
+
   // ── 固定分頁 ──
   ensureSheet_(ss, SHEETS.PERSON,  PERSON_COLUMNS,  { rows: PREP_ROWS_ROSTER }, log);
   ensureSheet_(ss, SHEETS.FLIGHT,  FLIGHT_COLUMNS,  { rows: PREP_ROWS_ROSTER }, log);
@@ -124,7 +130,7 @@ function setupSheet() {
  * ⚠️ 中文姓名**可以空白**（規格書：眷屬／訪客可空白），所以公式要先擋掉
  *    空白格。不擋的話所有還沒填中文名的列會全部變黃，整張表都是顏色。
  *
- * ⚠️ 範圍寫成開放式的 A2:K（不指定結束列），以後名冊加到幾百人都自動涵蓋，
+ * ⚠️ 範圍寫成開放式的 A2:J（不指定結束列），以後名冊加到幾百人都自動涵蓋，
  *    不必有人記得回來調範圍。
  *
  * ⚠️ 公式的參數分隔符號**跟地區設定有關**：en_US 用逗號、id_ID 用分號。
@@ -183,6 +189,71 @@ function columnLetter_(n) {
     n = Math.floor((n - 1) / 26);
   }
   return s;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   退役欄位的清除（一次性移轉）
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * 已經從 PERSON_COLUMNS 拿掉、但可能還留在試算表上的欄位標題。
+ *
+ * v2.3 移除「EMAIL NOTIFIKASI 通知信箱」：系統信只寄給管理者與超管，
+ * 從來沒有寄給個別人員，所以這一欄從上線到現在沒有任何程式讀過或寫過。
+ */
+var RETIRED_PERSON_HEADERS = ['EMAIL NOTIFIKASI 通知信箱'];
+
+/**
+ * 把人員名冊上已經退役的欄位整欄刪掉。
+ *
+ * ⚠️ **這一支存在的理由，是 applyStructure_() 的表頭是「按位置」寫的。**
+ *    程式定義少了一欄、而試算表上那一欄還在的話，setupSheet() 會把
+ *    「AKTIF 啟用」這個標題蓋到舊的通知信箱欄上——於是表上出現**兩個**
+ *    叫做「AKTIF 啟用」的欄，buildColumnMap_() 取到左邊那個（空的），
+ *    結果是**已停用的人全部重新出現在候選清單裡**，而且畫面上完全看不出來。
+ *
+ *    所以它被放在 setupSheet() 的最前面：先把退役欄刪掉，再套結構，
+ *    這樣「先改程式還是先刪欄」這個順序問題就不存在了。
+ *
+ * ⚠️ 兩道保險，讓它不可能刪錯欄：
+ *    1. 只刪**標題出現在退役名單上**的欄——不在名單上的一律不動，
+ *       所以管理者自己在右邊加的欄位（備註、暫存）不會被掃掉。
+ *    2. 只刪**目前定義裡沒有**的欄——萬一哪天又把某欄加回定義，
+ *       這裡就自動失效，不會把正在用的欄刪掉。
+ *
+ * ⚠️ 由右往左刪。由左往右刪的話，刪掉一欄之後右邊全部往左移一格，
+ *    先前記下來的欄號就整排錯位——那種錯不會報錯，只會刪錯欄。
+ *
+ * 重複執行是安全的：刪過之後就找不到那個標題了，第二次是空轉。
+ */
+function dropRetiredPersonColumns_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.PERSON);
+  if (!sheet) return '· 找不到 ' + SHEETS.PERSON + '，略過退役欄位清除';
+
+  var lastCol = sheet.getLastColumn();
+  if (!lastCol) return '· ' + SHEETS.PERSON + ' 還沒有表頭，略過退役欄位清除';
+
+  var inUse = {};
+  PERSON_COLUMNS.forEach(function (c) { inUse[normHeader_(c.name)] = true; });
+
+  var retired = {};
+  RETIRED_PERSON_HEADERS.forEach(function (h) { retired[normHeader_(h)] = true; });
+
+  var header = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var dropped = [];
+
+  for (var i = header.length - 1; i >= 0; i--) {
+    var name = normHeader_(header[i]);
+    if (!name) continue;
+    if (inUse[name]) continue;              // 還在用的，絕對不動
+    if (!retired[name]) continue;           // 不在退役名單上的，不動
+    sheet.deleteColumn(i + 1);
+    dropped.push(columnLetter_(i + 1) + ' 欄「' + name + '」');
+  }
+
+  if (!dropped.length) return '· ' + SHEETS.PERSON + ' 沒有需要清除的退役欄位';
+  return '✓ ' + SHEETS.PERSON + ' 已刪除退役欄位：' + dropped.join('、');
 }
 
 

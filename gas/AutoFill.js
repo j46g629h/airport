@@ -367,10 +367,25 @@ function readRoster_() {
   var out = { byEmail: {}, byName: {} };
   if (!sheet || sheet.getLastRow() < FIRST_DATA_ROW) { _ROSTER_CACHE = out; return out; }
 
-  var n = PERSON_COLUMNS.length;
-  var rows = sheet.getRange(FIRST_DATA_ROW, 1, sheet.getLastRow() - 1, n).getValues();
+  /* ⚠️ 欄位位置一律問表頭（buildColumnMap_），**不可以用 PERSON_COLUMNS 的定義順序**。
+   *
+   * 用定義順序的話，只要「程式的欄位定義」和「Sheet 上的實際欄位」有一邊先變、
+   * 另一邊還沒變，整排就位移一欄——而且完全不會有錯誤訊息：
+   *   c.aktif 指到空白欄 → CODE_OF[''] 不等於 'N' →
+   *   **已停用的人全部重新出現在管理者的候選清單裡**。
+   *
+   * v2.3 拿掉「EMAIL NOTIFIKASI 通知信箱」欄時就會踩到，因為它就在 AKTIF 的左邊；
+   * 不論先改程式還是先刪欄，中間那段時間都會壞。改用表頭比對之後，兩邊誰先誰後都無所謂。
+   */
+  var map = buildColumnMap_(sheet, PERSON_COLUMNS);
+  var width = sheet.getLastColumn();
+  if (!width) { _ROSTER_CACHE = out; return out; }
+
+  var rows = sheet.getRange(FIRST_DATA_ROW, 1, sheet.getLastRow() - 1, width).getValues();
   var c = {};
-  PERSON_COLUMNS.forEach(function (col, i) { c[col.code] = i; });
+  PERSON_COLUMNS.forEach(function (col) {
+    if (map[col.code]) c[col.code] = map[col.code] - 1;        // buildColumnMap_ 是 1 起算
+  });
 
   rows.forEach(function (r) {
     if (CODE_OF[String(r[c.aktif]).trim()] === 'N') return;      // 停用的不帶入
@@ -416,25 +431,39 @@ function onEditPerson_(e, sheet) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return;          // 搶不到鎖就放棄，下次編輯會再補
   try {
-    var n = PERSON_COLUMNS.length;
-    var iId = colIndexOf_(PERSON_COLUMNS, 'person_id') - 1;
-    var iEmail = colIndexOf_(PERSON_COLUMNS, 'email') - 1;
-    var iName = colIndexOf_(PERSON_COLUMNS, 'name') - 1;
-    var iAktif = colIndexOf_(PERSON_COLUMNS, 'aktif') - 1;
+    // ⚠️ 同 readRoster_：欄位位置問表頭，不用定義順序
+    var map = buildColumnMap_(sheet, PERSON_COLUMNS);
+    var iId    = map.person_id - 1;
+    var iEmail = map.email - 1;
+    var iName  = map.name - 1;
+    var iAktif = map.aktif - 1;
 
+    var width = sheet.getLastColumn();
+    if (!width) return;
+
+    var count = lastRow - firstRow + 1;
+    var values = sheet.getRange(firstRow, 1, count, width).getValues();
     var next = nextSeqId_(sheet, iId, 'P');
-    var range = sheet.getRange(firstRow, 1, lastRow - firstRow + 1, n);
-    var values = range.getValues();
-    var touched = false;
 
-    for (var r = 0; r < values.length; r++) {
+    /* 只把「真的要改的那兩欄」寫回去，不整排 setValues。
+       整排寫回會把使用者手打的其他欄位原封不動再寫一次——值一樣所以看不出來，
+       但那是沒必要的風險（型別會被轉成寫回去的那個型別）。 */
+    var ids = [], aktifs = [], touchedId = false, touchedAktif = false;
+
+    for (var r = 0; r < count; r++) {
       var row = values[r];
+      var id = String(row[iId]).trim();
+      var ak = String(row[iAktif]).trim();
       var hasIdentity = String(row[iEmail]).trim() && String(row[iName]).trim();
-      if (!hasIdentity) continue;
-      if (!String(row[iId]).trim())    { row[iId] = 'P' + pad3_(next++); touched = true; }
-      if (!String(row[iAktif]).trim()) { row[iAktif] = LIST_YATIDAK[0];  touched = true; }
+      if (hasIdentity) {
+        if (!id) { id = 'P' + pad3_(next++);  touchedId = true; }
+        if (!ak) { ak = LIST_YATIDAK[0];      touchedAktif = true; }
+      }
+      ids.push([id]);
+      aktifs.push([ak]);
     }
-    if (touched) range.setValues(values);
+    if (touchedId)    sheet.getRange(firstRow, map.person_id, count, 1).setValues(ids);
+    if (touchedAktif) sheet.getRange(firstRow, map.aktif,     count, 1).setValues(aktifs);
   } finally {
     lock.releaseLock();
   }
@@ -499,22 +528,31 @@ function onEditFlight_(e, sheet) {
   var lastRow  = Math.min(e.range.getLastRow(), firstRow + AUTOFILL_MAX_ROWS - 1);
   if (lastRow < firstRow) return;
 
-  var n = FLIGHT_COLUMNS.length;
-  var iFlight = colIndexOf_(FLIGHT_COLUMNS, 'flight') - 1;
-  var iAktif  = colIndexOf_(FLIGHT_COLUMNS, 'aktif') - 1;
+  // ⚠️ 同 readRoster_：欄位位置問表頭，不用定義順序
+  var map = buildColumnMap_(sheet, FLIGHT_COLUMNS);
+  var iFlight = map.flight - 1;
+  var iAktif  = map.aktif - 1;
 
-  var range = sheet.getRange(firstRow, 1, lastRow - firstRow + 1, n);
-  var values = range.getValues();
-  var touched = false;
+  var width = sheet.getLastColumn();
+  if (!width) return;
 
-  for (var r = 0; r < values.length; r++) {
+  var count = lastRow - firstRow + 1;
+  var values = sheet.getRange(firstRow, 1, count, width).getValues();
+
+  var flights = [], aktifs = [], touchedFlight = false, touchedAktif = false;
+
+  for (var r = 0; r < count; r++) {
     var row = values[r];
     var raw = String(row[iFlight]);
     var norm = raw.replace(/\s+/g, '').toUpperCase();
-    if (norm && norm !== raw) { row[iFlight] = norm; touched = true; }
-    if (norm && !String(row[iAktif]).trim()) { row[iAktif] = LIST_YATIDAK[0]; touched = true; }
+    var ak = String(row[iAktif]).trim();
+    if (norm && norm !== raw) touchedFlight = true;
+    if (norm && !ak) { ak = LIST_YATIDAK[0]; touchedAktif = true; }
+    flights.push([norm || raw]);
+    aktifs.push([ak]);
   }
-  if (touched) range.setValues(values);
+  if (touchedFlight) sheet.getRange(firstRow, map.flight, count, 1).setValues(flights);
+  if (touchedAktif)  sheet.getRange(firstRow, map.aktif,  count, 1).setValues(aktifs);
 
   markFlightDuplicates_(sheet);
 }

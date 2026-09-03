@@ -10,7 +10,7 @@
 
 var SYSTEM_INFO = {
   name: '機場接送系統',
-  version: '2.2',
+  version: '2.3',
   timezone: 'Asia/Jakarta',
   locale: 'id_ID'
 };
@@ -208,7 +208,17 @@ var VEHICLE_COLUMNS = [
   { code: 'aktif',        name: 'AKTIF 啟用',               width: 90,  list: LIST_YATIDAK }
 ];
 
-/** 人員名冊。EMAIL 允許重複（眷屬與員工共用），person_id 才是唯一識別。 */
+/**
+ * 人員名冊。EMAIL 允許重複（眷屬與員工共用），person_id 才是唯一識別。
+ *
+ * ⚠️ **這裡沒有「通知信箱」欄，是刻意的（v2.3 移除）。**
+ *    系統信只寄給管理者與超管，不寄給個別人員——收件人清單在 PENGATURAN 分頁。
+ *    真的要寄給某個人的話，主表 N 欄 EMAIL 和 U 欄 EMAIL KONTAK 就是收件地址，
+ *    名冊再放一欄只會讓管理者停下來想「這欄到底要不要填」。
+ *
+ *    ⚠️ 別跟 ADMIN_COLUMNS 的 email_notif 搞混——那一欄**正在用**，
+ *       是忘記密碼時臨時密碼的收件地址，不可以拿掉。
+ */
 var PERSON_COLUMNS = [
   { code: 'person_id',  name: 'person_id',                 width: 90,  format: '@', hidden: true },
   { code: 'email',      name: 'EMAIL 電子郵件',             width: 220, format: '@' },
@@ -219,7 +229,6 @@ var PERSON_COLUMNS = [
   { code: 'dorm',       name: 'DORM 房間號碼',              width: 100, format: '@' },
   { code: 'hp',         name: 'HP 手機號碼',                width: 140, format: '@' },
   { code: 'tipe',       name: 'TIPE 身分別',                width: 130, list: LIST_TIPE },
-  { code: 'email_notif', name: 'EMAIL NOTIFIKASI 通知信箱', width: 200, format: '@' },
   { code: 'aktif',      name: 'AKTIF 啟用',                 width: 90,  list: LIST_YATIDAK }
 ];
 
