@@ -17,7 +17,9 @@ var TRIGGER_PLAN = [
   { fn: 'rebuildIndexIfDirty', every: 'minutes', n: 5,
     why: '有人改過才重建 _INDEX。沒改過就 0.1 秒結束——無條件重建會超出每日配額' },
   { fn: 'markPastAsDone', every: 'hours', n: 1,
-    why: '把時間已經過去的「已排定」改成「已完成」，讓 Sheet 上的值跟使用者畫面一致' }
+    why: '把時間已經過去的「已排定」改成「已完成」，讓 Sheet 上的值跟使用者畫面一致' },
+  { fn: 'ensureUpcomingWeekSheets', every: 'days', n: 1, hour: 3,
+    why: '建好本週與未來三週的分頁，讓人永遠不必手動建立（手動建的沒有標記，程式認不得）' }
 ];
 
 

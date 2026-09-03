@@ -37,6 +37,11 @@ var INDEX_MAX_AGE_HOURS = 6;
  *    大部分的 5 分鐘區間根本沒有人動 Sheet，那些重建全是白做的。
  */
 function rebuildIndexIfDirty() {
+  // ⚠️ 這一段要在「有沒有變更」的判斷**之前**跑。
+  //    有人複製了一個分頁卻還沒編輯過時，旗標不會被立起來——
+  //    只在有變更時才掃的話，那個孤兒分頁永遠不會被認養。
+  if (adoptOrphanWeekSheets_().length) markIndexDirty_();
+
   var props = PropertiesService.getScriptProperties();
   var dirty = props.getProperty(PROP_INDEX_DIRTY) === '1';
   var builtAt = Number(props.getProperty(PROP_INDEX_BUILT) || 0);

@@ -587,13 +587,119 @@ function sortSheets() {
   return msg;
 }
 
-/** 建立下一週的分頁（之後會改成每週日自動執行） */
-function ensureNextWeekSheet() {
-  var d = new Date();
-  d.setDate(d.getDate() + 7);
-  var sheet = ensureWeekSheet(d);
-  Logger.log('下一週分頁：' + sheet.getName());
-  return sheet.getName();
+/**
+ * 建好「本週 ＋ 未來三週」的分頁。排程每天跑一次。
+ *
+ * ⚠️ 這一支是為了讓你**永遠不必手動建立週分頁**。
+ *    手動建的分頁沒有 weekStart 標記，程式認不得它——
+ *    資料打進去看起來一切正常，但 _INDEX 收不到，app 完全查不到那一整週，
+ *    而且**不會有任何錯誤訊息**。（真的手動建了也沒關係，
+ *    adoptOrphanWeekSheets_() 會自動認養，見下方。）
+ *
+ * 重複執行是安全的：已存在的分頁不會被動到。
+ */
+function ensureUpcomingWeekSheets() {
+  var created = [];
+  var existed = [];
+  for (var i = 0; i <= 21; i += 7) {
+    var d = new Date();
+    d.setDate(d.getDate() + i);
+    var name = weekSheetName_(d);
+    var before = !!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+    ensureWeekSheet(d);
+    (before ? existed : created).push(name);
+  }
+  if (created.length) sortSheets();
+
+  var msg = '週分頁檢查：新建 ' + created.length + ' 個' +
+            (created.length ? '（' + created.join('、') + '）' : '') +
+            '，已存在 ' + existed.length + ' 個';
+  Logger.log(msg);
+  if (created.length) logInfo_('ensureUpcomingWeekSheets', '自動建立週分頁', created.join('、'));
+  return msg;
+}
+
+
+/** 舊名字保留，免得有人照舊習慣執行它 */
+function ensureNextWeekSheet() { return ensureUpcomingWeekSheets(); }
+
+
+/**
+ * 這個分頁「長得像」週分頁嗎（表頭對得上主表的前幾欄）？
+ * 用來認出手動建立、但沒有 weekStart 標記的分頁。
+ */
+function looksLikeWeekSheet_(sheet) {
+  try {
+    if (sheet.getLastColumn() < 17) return false;
+    var header = sheet.getRange(1, 1, 1, 17).getValues()[0].map(normHeader_);
+    for (var i = 0; i < 5; i++) {                 // 前 5 欄對得上就算數
+      if (header[i] !== normHeader_(MAIN_COLUMNS[i].name)) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+
+/**
+ * 認養「長得像週分頁、但沒有 weekStart 標記」的分頁。
+ *
+ * ⚠️ 這是一張安全網。沒有它的話會發生這種連鎖失效：
+ *      手動複製一個分頁 → 沒有標記 → onEdit 不認得它、不會自動帶入
+ *      → 不會標記索引待更新 → 索引永遠不重建 → app 查不到那一整週
+ *    而畫面上完全看不出異常。
+ *
+ * 週次從**第一列有日期的資料**推算，不是從分頁名稱——
+ * 名稱是人取的，可能打錯或根本沒改。
+ */
+function adoptOrphanWeekSheets_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var adopted = [];
+
+  ss.getSheets().forEach(function (sheet) {
+    if (isWeekSheet_(sheet)) return;                       // 已經認得了
+    var name = sheet.getName();
+    if (name.charAt(0) === '_') return;                    // _INDEX 之類
+    for (var k in SHEETS) { if (SHEETS[k] === name) return; }   // 固定分頁
+    if (!looksLikeWeekSheet_(sheet)) return;
+
+    var last = sheet.getLastRow();
+    if (last < FIRST_DATA_ROW) return;                     // 還沒有資料，等有了再認養
+
+    var map = buildColumnMap_(sheet, MAIN_COLUMNS);
+    var dates = sheet.getRange(FIRST_DATA_ROW, map.tanggal, last - 1, 1).getValues();
+    var found = null;
+    for (var i = 0; i < dates.length && !found; i++) found = cellToDate_(dates[i][0]);
+    if (!found) return;                                    // 沒有任何一列有日期，無從判斷
+
+    sheet.addDeveloperMetadata('weekStart', isoDate_(weekStart_(found)));
+    adopted.push(name + ' → ' + weekSheetName_(found));
+  });
+
+  if (adopted.length) {
+    logInfo_('adoptOrphanWeekSheets', '認養手動建立的週分頁', adopted.join('；'));
+  }
+  return adopted;
+}
+
+
+/**
+ * 手動修復：認養孤兒分頁 ＋ 補齊格式 ＋ 排序。
+ * 覺得「有一整週的資料在 app 上查不到」時執行這一支。
+ */
+function repairWeekSheets() {
+  var adopted = adoptOrphanWeekSheets_();
+  var refreshed = refreshDropdowns();
+  sortSheets();
+  markIndexDirty_();
+
+  var msg = '認養 ' + adopted.length + ' 個分頁' +
+            (adopted.length ? '：\n  ' + adopted.join('\n  ') : '（沒有孤兒分頁）') +
+            '\n' + refreshed +
+            '\n索引已標記待重建，5 分鐘內會生效（要馬上生效就執行 rebuildIndex）';
+  Logger.log(msg);
+  return msg;
 }
 
 

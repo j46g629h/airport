@@ -56,6 +56,15 @@ function onEdit(e) {
     if (name === SHEETS.FLIGHT)  { onEditFlight_(e, sheet);  return; }
     if (name === SHEETS.VEHICLE) { onEditVehicle_(e, sheet); return; }
     if (isWeekSheet_(sheet))     { onEditWeek_(e, sheet);    return; }
+
+    // ⚠️ 手動建立（例如複製既有分頁）的週分頁沒有 weekStart 標記，
+    //    上面那一行認不得它。不當場認養的話會連鎖失效：
+    //    不帶入資料 → 不標記索引待更新 → 索引不重建 → app 查不到那一整週，
+    //    而畫面上完全看不出異常。所以在有人開始打字的當下就把它收編。
+    if (looksLikeWeekSheet_(sheet)) {
+      adoptOrphanWeekSheets_();
+      if (isWeekSheet_(sheet)) { onEditWeek_(e, sheet); return; }
+    }
   } catch (err) {
     // 簡易觸發器丟例外只會安靜地失敗，所以至少留一筆紀錄
     Logger.log('onEdit 失敗：' + err.message);
@@ -76,7 +85,16 @@ function onEditWeek_(e, sheet) {
   clearDerivedIfIdentityRemoved_(e, sheet);
   clearVehicleIfPlateRemoved_(e, sheet);
 
-  autoFillRows_(sheet, firstRow, lastRow - firstRow + 1);
+  // ⚠️ 上鎖是為了 booking_id：兩個人同時在打字時，
+  //    沒上鎖會拿到同一個號碼，程式會以為是同一筆，改 A 的時候改到 B。
+  //    搶不到鎖就先不補（下一次編輯會補上），不要卡住使用者打字。
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(8000)) return;
+  try {
+    autoFillRows_(sheet, firstRow, lastRow - firstRow + 1);
+  } finally {
+    lock.releaseLock();
+  }
 
   // 告訴排程「有東西改了，該重建索引了」。
   // 沒有這一行的話，排程只能無條件每 5 分鐘重建一次，一天就會超出配額（見 Index.js）。
@@ -171,7 +189,7 @@ function autoFillRows_(sheet, startRow, numRows) {
   var values = range.getValues();
 
   var iFactory = idx_('factory'), iStatus = idx_('status');
-  var iEmail = idx_('email'), iName = idx_('name');
+  var iEmail = idx_('email'), iName = idx_('name'), iBooking = idx_('booking_id');
   var iUpdAt = idx_('updated_at'), iUpdBy = idx_('updated_by');
 
   var defFactory = undefined;
@@ -221,6 +239,16 @@ function autoFillRows_(sheet, startRow, numRows) {
 
     // ── 狀態預設 ──
     if (!String(row[iStatus]).trim()) row[iStatus] = LIST_STATUS[0];
+
+    // ── booking_id：手打的列也要有編號 ──
+    // ⚠️ 沒有編號的列，階段 2d 的修改／刪除功能認不出來（設計約定第 3 條：
+    //    一律用 id 查找、不可用列號）。所以在打字的當下就給它。
+    //    只有日期填好之後才編號——沒有日期就算不出年月，
+    //    而且那種列通常是打到一半，先給號碼只會留下空洞。
+    if (!String(row[iBooking]).trim()) {
+      var d = cellToDate_(row[idx_('tanggal')]);
+      if (d) row[iBooking] = nextBookingId_(d);
+    }
 
     // ── 最後更新 ──
     if (now === null) { now = nowStampText_(); who = currentUser_(); }
