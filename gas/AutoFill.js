@@ -435,6 +435,58 @@ function onEditFlight_(e, sheet) {
     if (norm && !String(row[iAktif]).trim()) { row[iAktif] = LIST_YATIDAK[0]; touched = true; }
   }
   if (touched) range.setValues(values);
+
+  markFlightDuplicates_(sheet);
+}
+
+
+/**
+ * 把重複的航班號標成紅底並加上註解；不重複的就把標記清掉。
+ *
+ * ⚠️ 用「紅底 ＋ 註解」而不是跳視窗：
+ *    onEdit 是簡易觸發器，權限有限，`SpreadsheetApp.getUi().alert()`
+ *    在這裡會直接丟權限錯誤。而且跳視窗會打斷打字的節奏——
+ *    一格一格輸入時每打錯一次就跳一個框，很快就會讓人想關掉這個功能。
+ *    紅底是「看得到但不擋路」，這種提示才留得住。
+ *
+ * ⚠️ 每次都重掃整欄，不是只看剛改的那幾列。
+ *    只標新的那一列的話，你把重複的改掉之後，**另一列的紅底會一直留著**——
+ *    使用者會以為還沒解決，然後去找一個已經不存在的問題。
+ *    航班名冊只有幾十列，整欄重掃的成本可以忽略。
+ *
+ * ⚠️ 只提示、不阻擋。打到一半的值本來就可能暫時跟別人一樣。
+ */
+function markFlightDuplicates_(sheet) {
+  var last = sheet.getLastRow();
+  if (last < FIRST_DATA_ROW) return;
+
+  var iFlight = colIndexOf_(FLIGHT_COLUMNS, 'flight');
+  var range = sheet.getRange(FIRST_DATA_ROW, iFlight, last - 1, 1);
+  var values = range.getValues();
+
+  // 先數每個航班號各出現在哪幾列
+  var rowsOf = {};
+  values.forEach(function (r, i) {
+    var code = normPlate_(r[0]).replace(/\s+/g, '');
+    if (!code) return;
+    (rowsOf[code] = rowsOf[code] || []).push(FIRST_DATA_ROW + i);
+  });
+
+  var backgrounds = [];
+  var notes = [];
+  values.forEach(function (r, i) {
+    var code = normPlate_(r[0]).replace(/\s+/g, '');
+    var dup = code && rowsOf[code].length > 1;
+    backgrounds.push([dup ? '#FBEDEC' : null]);
+    notes.push([dup
+      ? '⚠️ 航班號重複\n' + code + ' 也出現在第 ' +
+        rowsOf[code].filter(function (n) { return n !== FIRST_DATA_ROW + i; }).join('、') +
+        ' 列。\n\n同一個航班號只能有一列，不然自動帶入起降時間時不知道要用哪一個。'
+      : '']);
+  });
+
+  range.setBackgrounds(backgrounds);
+  range.setNotes(notes);
 }
 
 
