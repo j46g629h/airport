@@ -33,17 +33,24 @@
 var AUTOFILL_MAX_ROWS = 200;
 
 /**
- * 名冊上「有問題的那一格」的底色。
+ * 名冊上的三種底色。
  *
- * ⚠️ 兩個顏色是兩種意思，不可以混用——這是號誌燈，不是裝飾：
- *   紅 = 確定有問題，一定要處理
- *   黃 = 疑似有問題，請你看一眼；確認沒事就忽略它
+ * ⚠️ 三個顏色是三種意思，不可以混用——這是號誌燈，不是裝飾：
+ *   🔴 紅 = 確定有問題，一定要處理
+ *   🟡 黃 = 疑似有問題，請你看一眼；確認沒事就忽略它
+ *   🔵 藍 = **不是問題**，只是把同一組的列標出來方便整理
  *
- * 色碼跟前端 css/style.css 的 --danger-bg / --warn-bg 是同一組，
- * 這樣試算表跟網頁對「錯誤」與「注意」用的是同一套視覺語言。
+ * ⚠️ 藍色那一類最容易被寫成紅色，但那是錯的：
+ *    眷屬與員工共用一個 email 是刻意的設計（設計約定第 6 條），
+ *    用紅色標正常資料，看幾次之後管理者就會開始忽略所有紅色，
+ *    真正該處理的那幾筆也會跟著被忽略。號誌燈只有在紅燈稀少時才有用。
+ *
+ * 色碼跟前端 css/style.css 的 --danger-bg / --warn-bg / --info-bg 同一組，
+ * 這樣試算表跟網頁用同一套視覺語言。
  */
 var MARK_DUP_BG  = '#FBEDEC';   // 紅：確定重複
 var MARK_TYPO_BG = '#FBF2E3';   // 黃：疑似打錯字
+var MARK_GROUP_BG = '#E8F0FA';  // 藍：同一個 email 的一組人（資訊，不是錯誤）
 
 /**
  * 依名冊自動帶入的欄位。**清除時也是清這一份清單，兩邊必須是同一份。**
@@ -467,9 +474,12 @@ function markPersonDuplicates_(sheet) {
   var last = sheet.getLastRow();
   if (last < FIRST_DATA_ROW) return;
 
-  var iEmail = colIndexOf_(PERSON_COLUMNS, 'email');
-  var iName  = colIndexOf_(PERSON_COLUMNS, 'name');
-  var values = sheet.getRange(FIRST_DATA_ROW, 1, last - 1, PERSON_COLUMNS.length).getValues();
+  // ⚠️ 用 buildColumnMap_ 讀 Sheet 上**實際的表頭位置**，不可以用欄位定義的順序。
+  //    有人插入或搬動欄位之後，順序就不是定義的順序了——照順序讀會整批
+  //    錯位讀到隔壁欄，而且完全不會報錯（gas/Utils.js 檔頭的警告）。
+  var map = buildColumnMap_(sheet, PERSON_COLUMNS);
+  var iEmail = map.email, iName = map.name;
+  var values = sheet.getRange(FIRST_DATA_ROW, 1, last - 1, sheet.getLastColumn()).getValues();
 
   // 每一列先算出正規化的 email 與姓名（大小寫、多餘空白都壓掉）
   var rows = values.map(function (r, i) {
@@ -480,7 +490,66 @@ function markPersonDuplicates_(sheet) {
     };
   });
 
-  // ── 第一層：email ＋ 姓名完全一樣 → 確定重複（紅） ──
+  // ⚠️ 依 email 分組時**只要 email 有值就算**，不管姓名打了沒有。
+  //    「同一個 email 出現在哪幾列」這件事跟姓名無關，
+  //    要求姓名也填好的話，剛貼上一批還沒補完的資料就標不出來。
+  var byEmail = {};
+  rows.forEach(function (o) {
+    if (!o.email) return;
+    (byEmail[o.email] = byEmail[o.email] || []).push(o);
+  });
+
+  markEmailGroups_(sheet, rows, byEmail, iEmail, last);
+  markSamePerson_(sheet, rows, byEmail, iName, last);
+}
+
+
+/**
+ * 【email 欄】同一個 email 出現在兩列以上 → 淡藍底 ＋ 註解列出同組的列號。
+ *
+ * ⚠️ 這是**資訊，不是錯誤**，所以刻意不用紅色。
+ *    眷屬與員工共用一個信箱是這個系統刻意的設計（設計約定第 6 條）——
+ *    用紅色標正常資料，看幾次之後管理者就會開始忽略所有紅色，
+ *    真正該處理的那幾筆也會跟著被忽略。號誌燈只有在紅燈稀少時才有用。
+ *
+ * 用途純粹是整理名冊時「一眼看出哪幾列是同一組人」。
+ */
+function markEmailGroups_(sheet, rows, byEmail, iEmail, last) {
+  var backgrounds = [], notes = [];
+
+  rows.forEach(function (o) {
+    var g = o.email ? byEmail[o.email] : null;
+    if (!g || g.length < 2) { backgrounds.push([null]); notes.push(['']); return; }
+
+    var others = g.filter(function (x) { return x.row !== o.row; })
+                  .map(function (x) { return x.row; });
+    backgrounds.push([MARK_GROUP_BG]);
+    notes.push(['👥 這個 email 有 ' + g.length + ' 個人共用\n' +
+      '另外幾列：第 ' + others.join('、') + ' 列\n\n' +
+      '眷屬與員工共用同一個信箱是正常的，這個顏色只是讓你整理名冊時\n' +
+      '一眼看出哪幾列是同一組，不影響任何功能。\n\n' +
+      '⚠️ 但同一組裡的**房號要各自填各自的**，不可以互相抄——\n' +
+      '實際資料裡一家三口住 R6-1 / R6-2 / R6-3 三間不同的房。']);
+  });
+
+  var range = sheet.getRange(FIRST_DATA_ROW, iEmail, last - 1, 1);
+  range.setBackgrounds(backgrounds);
+  range.setNotes(notes);
+}
+
+
+/**
+ * 【姓名欄】真正的錯誤：同一個人被建了兩次。
+ *
+ *   🔴 紅底　email ＋ 姓名**完全一樣** → 確定重複
+ *   🟡 黃底　同一個 email 底下，姓名只差一兩個字母 → 疑似打成兩種拼法
+ *
+ * ⚠️ 跟 email 欄的淡藍是**兩件事**，所以標在不同欄位：
+ *    藍色在 email 欄說「這幾列是同一組」；紅黃在姓名欄說「這一列有問題」。
+ *    同一格塗兩種意思的顏色，看的人分不出來在講什麼。
+ */
+function markSamePerson_(sheet, rows, byEmail, iName, last) {
+  // 第一層：email ＋ 姓名完全一樣
   var sameRows = {};
   rows.forEach(function (o) {
     if (!o.email || !o.name) return;
@@ -488,21 +557,10 @@ function markPersonDuplicates_(sheet) {
     (sameRows[k] = sameRows[k] || []).push(o.row);
   });
 
-  // ── 第二層：同一個 email 底下，姓名很像但不一樣 → 疑似打錯字（黃） ──
-  //
-  // ⚠️ **只在同一個 email 群組內比對**，不是拿全名冊兩兩比。
-  //    一個 email 底下通常只有 2~4 個人（一家人），範圍小、誤報機率低；
-  //    全名冊兩兩比的話，「Mr Andy Chen」跟「Mr Andy Chan」這種
-  //    毫不相干的兩個人也會被標起來。
-  var byEmail = {};
-  rows.forEach(function (o) {
-    if (!o.email || !o.name) return;
-    (byEmail[o.email] = byEmail[o.email] || []).push(o);
-  });
-
-  var typoRows = {};                       // 列號 → [疑似對象的列號…]
+  // 第二層：同一個 email 底下，姓名很像但不一樣（疑似打錯字）
+  var typoRows = {};
   Object.keys(byEmail).forEach(function (e) {
-    var g = byEmail[e];
+    var g = byEmail[e].filter(function (x) { return x.name; });   // 姓名還沒打的不比
     for (var i = 0; i < g.length; i++) {
       for (var j = i + 1; j < g.length; j++) {
         if (!looksLikeTypo_(g[i].name, g[j].name)) continue;
@@ -512,21 +570,20 @@ function markPersonDuplicates_(sheet) {
     }
   });
 
-  var backgrounds = [];
-  var notes = [];
+  var backgrounds = [], notes = [];
   rows.forEach(function (o) {
     var key = (o.email && o.name) ? (o.email + '|' + o.name) : '';
-    var dupWith  = key && sameRows[key].length > 1
+    var dupWith = key && sameRows[key].length > 1
       ? sameRows[key].filter(function (n) { return n !== o.row; }) : null;
-    // ⚠️ 確定重複優先。一列同時符合兩者時顯示紅色——
+    // ⚠️ 確定重複優先。同時符合兩者時顯示紅色——
     //    「確定要處理」比「請你確認一下」嚴重，不可以被蓋掉。
     var typoWith = !dupWith ? typoRows[o.row] : null;
 
     if (dupWith) {
       backgrounds.push([MARK_DUP_BG]);
-      notes.push(['⚠️ 名冊重複\n' +
-        '同一個人也出現在第 ' + dupWith.join('、') + ' 列（email 與姓名都一樣）。\n\n' +
-        '同一個人建兩次的後果：\n' +
+      notes.push(['⚠️ 同一個人建了兩次\n' +
+        '第 ' + dupWith.join('、') + ' 列的 email 與姓名跟這一列完全一樣。\n\n' +
+        '後果：\n' +
         '· 改房號或停用時只會改到其中一筆，另一筆繼續生效\n' +
         '· 兩筆的值一旦不一樣，輸入接送資料時那個欄位就會安靜地不再自動帶入\n\n' +
         '請把多餘的那一列刪掉（歷史紀錄不會受影響）。']);
@@ -704,7 +761,8 @@ function markFlightDuplicates_(sheet) {
   var last = sheet.getLastRow();
   if (last < FIRST_DATA_ROW) return;
 
-  var iFlight = colIndexOf_(FLIGHT_COLUMNS, 'flight');
+  // ⚠️ 讀 Sheet 上實際的表頭位置，不是欄位定義的順序（理由見 gas/Utils.js 檔頭）
+  var iFlight = buildColumnMap_(sheet, FLIGHT_COLUMNS).flight;
   var range = sheet.getRange(FIRST_DATA_ROW, iFlight, last - 1, 1);
   var values = range.getValues();
 
