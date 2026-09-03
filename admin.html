@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Login Admin — Antar Jemput Bandara</title>
-<link rel="stylesheet" href="css/style.css?v=1.7">
+<link rel="stylesheet" href="css/style.css?v=1.8">
 </head>
 <body>
 
@@ -98,6 +98,10 @@
       <dt data-i18n="adm.account">Akun</dt><dd id="doneAccount"></dd>
       <dt data-i18n="adm.role">Peran</dt><dd id="doneRole"></dd>
     </dl>
+    <!-- 班表列表：一般管理者與超管都能用 -->
+    <p>
+      <a class="btn" href="admin-list.html" data-i18n="list.link">Daftar Jadwal</a>
+    </p>
     <!-- 只有超級管理者看得到。後端也會擋，這裡只是不要讓一般管理者點進去撞牆 -->
     <p id="adminNav" hidden>
       <a class="btn" href="admin-accounts.html" data-i18n="acc.link">Kelola Akun</a>
@@ -112,11 +116,11 @@
 
 </main>
 
-<script src="js/config.js?v=1.7"></script>
-<script src="js/i18n.js?v=1.7"></script>
-<script src="js/api.js?v=1.7"></script>
-<script src="js/admin-session.js?v=1.7"></script>
-<script src="js/admin-login.js?v=1.7"></script>
+<script src="js/config.js?v=1.8"></script>
+<script src="js/i18n.js?v=1.8"></script>
+<script src="js/api.js?v=1.8"></script>
+<script src="js/admin-session.js?v=1.8"></script>
+<script src="js/admin-login.js?v=1.8"></script>
 
 </body>
 </html>
