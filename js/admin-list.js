@@ -64,6 +64,11 @@ document.addEventListener('DOMContentLoaded', function () {
      使用者這段時間就看得到篩選條件、可以先調，資料區顯示骨架。 */
   document.getElementById('content').hidden = false;
 
+  /* ⚠️ 先用 sessionStorage 裡既有的 profile 畫導覽列——那是登入時存的，
+     所以進到這一頁的當下就有，不必等 API。requireLogin 回來後再畫一次，
+     萬一角色剛被超管改掉，畫面會跟著更正。 */
+  renderPageNav('list');
+
   /* ── 兩支 API 同時發（v2.5）────────────────────────────────
    *
    * 先前是串起來等的：
@@ -80,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * ⚠️ token 失效時兩支都會失敗：listBookings 會先閃一下錯誤訊息，
    *    接著 requireLogin 把人導回登入頁。順序不保證，但結果一樣是導頁。
    */
-  requireLogin();
+  requireLogin().then(function () { renderPageNav('list'); });
   loadData();
 });
 
@@ -207,8 +212,8 @@ function setQuickRange(kind) {
   } else if (kind === 'month') {
     from = isoOf(new Date(today.getFullYear(), today.getMonth(), 1));
     to   = isoOf(new Date(today.getFullYear(), today.getMonth() + 1, 0));
-  } else if (kind === 'past30') {
-    from = isoOf(addDays(today, -30));
+  } else if (kind === 'past14') {
+    from = isoOf(addDays(today, -14));
     to   = isoOf(today);
   }
   // kind === 'all' → 兩邊留空＝不限

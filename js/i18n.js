@@ -28,11 +28,11 @@ const I18N = {
     'query.tab.flight':'NO Pesawat',
 
     'query.email.label': 'Alamat email',
-    'query.email.hint':  'Tidak perlu lengkap — ketik sebagian saja (minimal 3 huruf). Keluarga yang memakai email yang sama akan ikut tampil.',
+    'query.email.hint':  'Ketik minimal bagian sebelum @ (contoh: linda.lim). Keluarga yang memakai email yang sama akan ikut tampil.',
     'query.date.label':  'Tanggal Pesawat',
     'query.date.hint':   'Menampilkan semua orang pada tanggal tersebut.',
     'query.flight.label':'NO Pesawat',
-    'query.flight.hint': 'Contoh: CI761, CX798. Menampilkan semua orang di penerbangan yang sama.',
+    'query.flight.hint': 'Contoh: CI761, CX798. Huruf dan angka, tanpa spasi, huruf besar/kecil bebas. Menampilkan semua orang di penerbangan yang sama.',
     'query.submit':      'Cari',
     'query.searching':   'Mencari…',
 
@@ -174,8 +174,11 @@ const I18N = {
     'list.quick.week':  'Minggu ini',
     'list.quick.14':    '14 hari ke depan',
     'list.quick.month': 'Bulan ini',
-    'list.quick.past':  '30 hari lalu',
+    'list.quick.past':  '14 hari lalu',
     'list.quick.all':   'Semua',
+
+    'nav.list':     'Daftar Jadwal',
+    'nav.accounts': 'Kelola Akun',
     'list.liveHint':    'Filter di bawah bekerja langsung — tidak perlu cari ulang.',
     'list.keyword':     'Nama / email / kamar',
     'list.keyword.ph':  'Ketik sebagian saja',
@@ -240,11 +243,11 @@ const I18N = {
     'query.tab.flight':'航班號',
 
     'query.email.label': '電子郵件',
-    'query.email.hint':  '不用打完整——打一部分就好（至少 3 個字）。共用同一個信箱的家屬會一起顯示。',
+    'query.email.hint':  '至少打到 @ 前面那一段（例如 linda.lim）。共用同一個信箱的家屬會一起顯示。',
     'query.date.label':  '航班日期',
     'query.date.hint':   '顯示當天所有人的接送安排。',
     'query.flight.label':'航班號',
-    'query.flight.hint': '例如 CI761、CX798。顯示同班機所有人。',
+    'query.flight.hint': '例如 CI761、CX798。英文與數字不需空格，大小寫不拘。顯示同班機所有人。',
     'query.submit':      '查詢',
     'query.searching':   '查詢中…',
 
@@ -386,8 +389,11 @@ const I18N = {
     'list.quick.week':  '本週',
     'list.quick.14':    '未來 14 天',
     'list.quick.month': '本月',
-    'list.quick.past':  '過去 30 天',
+    'list.quick.past':  '過去 14 天',
     'list.quick.all':   '全部',
+
+    'nav.list':     '班表列表',
+    'nav.accounts': '帳號管理',
     'list.liveHint':    '以下的篩選是即時的，不必重新查詢。',
     'list.keyword':     '姓名／電子郵件／房號',
     'list.keyword.ph':  '打一部分就好',

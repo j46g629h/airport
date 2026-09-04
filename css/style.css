@@ -276,6 +276,54 @@ a { color: var(--action); }
 }
 
 /**
+ * 管理端導覽列（v2.7）——貼在頂列下面，登入後每一頁都有。
+ *
+ * ⚠️ 橫向可捲（overflow-x: auto）而不是換行：2d 之後項目會變多，
+ *    在 320px 上換行會把資料一路往下推。可捲的話它永遠只佔一行。
+ * ⚠️ 但**不可以出現頁面層級的橫向捲動**——所以捲的是這一條，不是整頁。
+ */
+.adminnav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px var(--gap);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.adminnav::-webkit-scrollbar { display: none; }
+
+.adminnav a {
+  flex: 0 0 auto;                     /* 不要被壓扁，寧可捲 */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* ⚠️ 用 aria-current 當選取樣式的鉤子，不另外加 class——
+      這樣「畫面上看得出在哪一頁」和「螢幕閱讀器知道在哪一頁」是同一件事，
+      不會有其中一個忘了更新的問題。 */
+.adminnav a[aria-current="page"] {
+  background: var(--action);
+  border-color: var(--action);
+  color: #fff;
+}
+
+.adminnav a:active { background: var(--surface-alt); }
+
+
+/**
  * 語言切換：兩顆並排的小膠囊。
  *
  * ⚠️ margin-left:auto 是它**自己**靠右，不依賴左邊有什麼元素。
@@ -741,7 +789,31 @@ select {
   gap: var(--gap);
   flex-wrap: wrap;
 }
-.daterange-one { flex: 1 1 160px; }
+/* ⚠️ min-width: 0 —— 防禦規則第 3 條要「逐個列出容器」，v2.4 漏了這一個。
+      沒有它，flex 子元素不會縮到內容寬度以下，而 iOS 的日期輸入框內容很寬。 */
+.daterange-one { flex: 1 1 160px; min-width: 0; }
+
+/**
+ * ⚠️ iOS Safari 的 <input type="date">（v2.7 修，iPhone 15 Pro 實機回報）
+ *
+ * 少了 -webkit-appearance: none 的話，iOS 用**原生控制項**來畫它：
+ *   · 忽略我們給的 width: 100%，改用它自己的內容寬度
+ *     → 輸入框比卡片還寬，右邊凸出去約 17px
+ *   · 日期文字**置中**（「4 Sep 2026」），跟其他輸入框一律靠左不一致
+ *
+ * ⚠️ 這在 Chrome／Android 上完全看不出來——那邊的日期框本來就窄
+ *    （實測內容最小寬度只有 125px），所以在電腦上測永遠測不到。
+ *    跟 v2.6 那個「手機收不起來」是同一類問題：**平台差異只能靠實機發現**。
+ *
+ * ⚠️ appearance: none 只拿掉外觀，**不影響原生日期選擇器**——
+ *    點下去照樣跳 iOS 的滾輪選日期，功能一點都沒少。
+ */
+.field input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  text-align: left;
+}
 .daterange-lab {
   display: block;
   font-size: var(--fs-sm);
@@ -749,12 +821,62 @@ select {
   margin-bottom: 4px;
 }
 
-/* 一整排可以按的小按鈕（快捷區間、接／送、狀態） */
+/**
+ * 一整排可以按的小按鈕（快捷區間、接／送、狀態）。
+ *
+ * 寬螢幕用 flex 自動換行：按鈕各自貼合文字寬度，排起來自然。
+ * ⚠️ 但手機上這樣會**排得參差不齊**——「本週」很窄、「未來 14 天」很寬，
+ *    5 顆變成 3＋2 但左右邊界對不齊，看起來像沒排好。
+ *    窄螢幕改用 3 欄格線，見下方 420px 那一段。
+ */
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
+}
+
+/**
+ * 窄螢幕：篩選按鈕改成 3 欄格線（v2.7）。
+ *
+ * ⚠️ 這一段**必須放在上面 .chips 的基本宣告之後**。
+ *    兩邊的選擇器同樣是 .chips（權重相同），CSS 在權重相同時是
+ *    **後面的贏**——媒體查詢不會加權重。所以把它寫在檔案前面
+ *    （例如頁首那一段的 420px 區塊裡）的話，會被後面的
+ *    display: flex 蓋掉，而且**完全不會報錯**，只是手機上看起來沒生效。
+ *    這是實際踩過的坑。
+ *
+ * ⚠️ 斷點沿用既有的 420px，不是新增第四個斷點（設計約定第 9 條）。
+ *
+ * 為什麼是 3 欄：現有的三組按鈕剛好都排得漂亮——
+ *   快捷區間 5 顆 → 3＋2（兩行）
+ *   狀態     6 顆 → 3＋3（兩行）
+ *   接／送   3 顆 → 一行
+ *
+ * ⚠️ 3 欄是實測出來的上限，不是隨便挑的。320px 螢幕扣掉內距約剩 254px，
+ *    3 欄各 79px；印尼文最長的「14 hari ke depan」在裡面折成兩行還放得下，
+ *    4 欄就會把字擠爆。
+ *
+ * ⚠️ 格線讓同一列的按鈕**等寬等高**（flex 不會），所以文字長短不一時
+ *    邊界仍然對齊。這正是手機上「排得整齊」與「參差不齊」的差別。
+ */
+@media screen and (max-width: 420px) {
+  .chips {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .chips .chip {
+    width: 100%;
+    padding: 8px 4px;                 /* 左右內距收小，把寬度讓給文字 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.25;
+  }
+
+  /* 見上方 #toggleMore 的說明——窄螢幕拉成整條，與狀態格線明顯分開 */
+  #toggleMore { width: 100%; }
 }
 
 /* ⚠️ 選中的狀態不能只靠顏色深淺——工廠的光線下看不出來。
@@ -765,6 +887,14 @@ select {
   color: #fff;
   font-weight: 600;
 }
+
+/* 「Filter lain 其他篩選」那一顆。
+ *
+ * ⚠️ 它**不是狀態選項**，是「展開更多篩選」的開關。但它跟狀態那排
+ *    用同一個 .chip 樣式、又緊貼在下面，使用者實際上把它
+ *    **數成了狀態的第 7 顆按鈕**（v2.7 回報）。
+ *    拉開間距、窄螢幕拉成整條，讓它一眼就看得出是另一件事。 */
+#toggleMore { margin-top: 14px; }
 
 .sep {
   border: 0;

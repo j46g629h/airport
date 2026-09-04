@@ -6,13 +6,13 @@
 <meta name="theme-color" content="#EFEFED">
 <meta name="robots" content="noindex, nofollow">
 <!-- 圖示與主畫面設定的完整說明在 index.html 的 <head> -->
-<link rel="icon" href="favicon.svg?v=2.6" type="image/svg+xml">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.6">
-<link rel="manifest" href="manifest.json?v=2.6">
+<link rel="icon" href="favicon.svg?v=2.7" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.7">
+<link rel="manifest" href="manifest.json?v=2.7">
 <!-- CSS 還沒下載完之前先鋪底色，避免工廠 wifi 慢時先白閃一下 -->
 <style>html{background:#EFEFED}</style>
 <title>Kelola Akun — PCI Antar Jemput Bandara</title>
-<link rel="stylesheet" href="css/style.css?v=2.6">
+<link rel="stylesheet" href="css/style.css?v=2.7">
 </head>
 <body>
 
@@ -33,6 +33,20 @@
     <button type="button" data-lang="zh" aria-pressed="false">中</button>
   </nav>
 </header>
+
+<!--
+  管理端導覽列（v2.7）。登入後在每一頁都看得到，不必按上一頁再點進去。
+
+  ⚠️ 只有超級管理者看得到「帳號管理」。後端也會擋（gas/Admins.js 的 withSuper），
+     這裡只是不要讓一般管理者點進去撞牆。
+  ⚠️ 預設 hidden。真正決定顯不顯示的是 js/admin-session.js 的 renderPageNav()——
+     一般管理者目前只有一項可以去，單獨一顆按鈕的導覽列看起來像壞掉，
+     那種情況乾脆整條不顯示（2d 加了「新增」就會自然有兩項）。
+-->
+<nav class="adminnav" id="pageNav" aria-label="Admin" hidden>
+  <a href="admin-list.html" data-nav="list" data-i18n="nav.list">Daftar Jadwal</a>
+  <a href="admin-accounts.html" data-nav="accounts" data-super data-i18n="nav.accounts">Kelola Akun</a>
+</nav>
 
 <main class="wrap">
 
@@ -98,11 +112,11 @@
 
 </main>
 
-<script src="js/config.js?v=2.6"></script>
-<script src="js/i18n.js?v=2.6"></script>
-<script src="js/api.js?v=2.6"></script>
-<script src="js/admin-session.js?v=2.6"></script>
-<script src="js/admin-accounts.js?v=2.6"></script>
+<script src="js/config.js?v=2.7"></script>
+<script src="js/i18n.js?v=2.7"></script>
+<script src="js/api.js?v=2.7"></script>
+<script src="js/admin-session.js?v=2.7"></script>
+<script src="js/admin-accounts.js?v=2.7"></script>
 
 </body>
 </html>

@@ -35,6 +35,41 @@ function getProfile() {
   catch (e) { return {}; }
 }
 
+/**
+ * 管理端的導覽列（v2.7）——登入後在每一頁切換，不必按上一頁。
+ *
+ * ⚠️ 只有一項可以去的時候整條不顯示。
+ *    一般管理者目前只有「班表列表」，而他本來就在那一頁——
+ *    畫一條只有一顆按鈕、而且按了還停在原地的導覽列，
+ *    使用者會以為壞了。2d 加了「新增」之後就會自然有兩項。
+ *
+ * ⚠️ 前端把超管專屬的項目藏起來只是體驗，**真正的把關在後端**
+ *    （gas/Admins.js 的權限檢查）。藏起來是為了不要讓一般管理者
+ *    點進去撞一面「你沒有權限」的牆。
+ *
+ * @param {string} current  目前這一頁的代號（data-nav 的值）
+ */
+function renderPageNav(current) {
+  const nav = document.getElementById('pageNav');
+  if (!nav) return;
+
+  const isSuper = !!getProfile().is_super;
+  let usable = 0;
+
+  nav.querySelectorAll('a[data-nav]').forEach(function (a) {
+    const superOnly = a.hasAttribute('data-super');
+    const show = !superOnly || isSuper;
+    a.hidden = !show;
+    if (show) usable++;
+    // aria-current 讓螢幕閱讀器也知道「你在這一頁」，不是只有顏色不同
+    if (a.dataset.nav === current) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+
+  nav.hidden = usable < 2;
+}
+
+
 function clearSession() {
   try {
     sessionStorage.removeItem(SS_TOKEN);

@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
   myAccount = profile.account || '';
   document.getElementById('content').hidden = false;
+  renderPageNav('accounts');
   loadList();
 });
 
