@@ -111,6 +111,25 @@ img, svg, video, canvas, table, pre { max-width: 100%; }
 .topbar > *,
 .kv > dt, .kv > dd { min-width: 0; }
 
+/* ⚠️ 第 4 條（v2.5 補）。**藏起來就是要藏起來，任何版面規則都不可以蓋過它。**
+ *
+ * 瀏覽器內建的 `[hidden] { display: none }` 是 UA 規則，
+ * 任何一條作者寫的 display 都贏得過它。而卡片模式那一段正好有：
+ *
+ *     @media screen and (max-width: 760px) {
+ *       .dtable, .dtable tbody, .dtable tr, .dtable td { display: block; }
+ *     }
+ *
+ * 於是 `row.hidden = true` 在手機上**完全沒有效果**——
+ * 班表列表的「詳細／收合」按鈕點了沒反應，每一筆永遠是展開的。
+ * 桌機沒事（那裡沒有作者的 display 規則），所以在電腦上測永遠測不出來。
+ *
+ * 這是 v1.8 卡片模式一起帶進來的，v2.5 才由使用者回報發現。
+ * 用 !important 是對的：hidden 是「這個東西現在不該存在」的語意宣告，
+ * 沒有任何版面理由可以推翻它。
+ */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
