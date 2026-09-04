@@ -85,7 +85,10 @@ document.addEventListener('DOMContentLoaded', function () {
    * ⚠️ token 失效時兩支都會失敗：listBookings 會先閃一下錯誤訊息，
    *    接著 requireLogin 把人導回登入頁。順序不保證，但結果一樣是導頁。
    */
-  requireLogin().then(function () { renderPageNav('list'); });
+  requireLogin().then(function () {
+    renderPageNav('list');
+    startIdleWatch();                 // v2.8 閒置自動登出
+  });
   loadData();
 });
 

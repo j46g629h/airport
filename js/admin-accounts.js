@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   myAccount = profile.account || '';
   document.getElementById('content').hidden = false;
   renderPageNav('accounts');
+  startIdleWatch();                   // v2.8 閒置自動登出
   loadList();
 });
 

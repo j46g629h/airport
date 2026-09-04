@@ -161,7 +161,11 @@ function adminLogin(params) {
     name: session.name,
     role: session.role,
     is_super: session.role === ADMIN_ROLES.SUPER,
-    must_change_password: session.must_change_password
+    must_change_password: session.must_change_password,
+    /* v2.8：前端的閒置計時器用這個數字，**不要在前端寫死**。
+       兩邊各寫一個數字的話，改了後端忘了改前端，就會出現
+       「畫面說還有 10 分鐘，按下去卻說登入已過期」。 */
+    idle_minutes: Math.round(AUTH.IDLE_TTL / 60)
   });
 }
 
@@ -185,7 +189,12 @@ function getAdminProfile(params, session) {
     name: session.name,
     role: session.role,
     is_super: session.role === ADMIN_ROLES.SUPER,
-    must_change_password: session.must_change_password
+    must_change_password: session.must_change_password,
+    /* ⚠️ 登入那一支也回同一個欄位，兩支都要。
+       只加在登入的話，使用者重新整理頁面後 profile 會被這一支蓋掉，
+       idle_minutes 就不見了——前端會退回預設值 60 分鐘，
+       日後把 IDLE_TTL 改成別的數字時，這件事會安靜地錯。 */
+    idle_minutes: Math.round(AUTH.IDLE_TTL / 60)
   });
 }
 
@@ -338,6 +347,7 @@ function requestPasswordReset(params) {
 function createSession_(session) {
   storeSweepExpired();                 // 登入不頻繁，順手清掉過期的資料
   var token = Utilities.getUuid();
+  session.seen = new Date().getTime();  // v2.8：最後活動時間，閒置登出用
   refreshSession_(token, session);
   return token;
 }
@@ -366,9 +376,35 @@ function readSession_(token) {
  *    在路由表統一包起來，漏掉的話一眼就看得出來。
  */
 function withAuth(params, handler, requireSuper) {
-  var session = readSession_(str_(params.token));
+  var token = str_(params.token);
+  var session = readSession_(token);
   if (!session) return fail_('UNAUTHORIZED');
+
+  /* ── 閒置自動登出（v2.8）────────────────────────────────────
+     ⚠️ 這一關要放在**權限檢查之前**。順序反過來的話，一支已經閒置到期的
+        憑證去打超管專屬的 API 會拿到 FORBIDDEN（「你沒有權限」），
+        使用者會以為是權限被拿掉了，實際上只是該重新登入。
+
+     ⚠️ 到期要**當場把憑證刪掉**，不能只回錯誤。留著的話它會一直躺到
+        TOKEN_TTL 才被掃掉，而那段期間它仍然是一支「存在的」憑證。
+
+     ⚠️ seen 是空的＝這支憑證是 v2.8 之前發出來的。這種情況**不判定為到期**，
+        直接補上時間就好——不然一部署上去，所有正在使用的人會同時被登出。 */
+  var now = new Date().getTime();
+  var seen = Number(session.seen) || 0;
+  if (seen && now - seen > AUTH.IDLE_TTL * 1000) {
+    storeRemove(STORE_KEYS.TOKEN + token);
+    return fail_('SESSION_IDLE', String(Math.round(AUTH.IDLE_TTL / 60)));
+  }
+
   if (requireSuper && session.role !== ADMIN_ROLES.SUPER) return fail_('FORBIDDEN');
+
+  // 續期。每次都寫太貴，隔 IDLE_TOUCH_GAP 才寫一次（見 Config.js 的說明）
+  if (now - seen > AUTH.IDLE_TOUCH_GAP * 1000) {
+    session.seen = now;
+    refreshSession_(token, session);
+  }
+
   return handler(session);
 }
 

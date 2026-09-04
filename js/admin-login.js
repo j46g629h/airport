@@ -35,8 +35,33 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   document.getElementById('logoutBtn').addEventListener('click', function () { doLogout(); });
 
-  boot();
+  /* ⚠️ 一定要等 boot() 跑完才顯示原因。showPanel() 的最後一行是
+     showMsg('', '')——先顯示的話會被它清掉，而且畫面上完全看不出
+     訊息曾經出現過。 */
+  boot().then(showBounceReason);      // v2.8：講清楚「為什麼會回到這一頁」
 });
+
+
+/**
+ * 被系統送回登入頁時，把原因講出來（v2.8）。
+ *
+ * ⚠️ 沒有這一段的話，閒置到期的人只會看到「登入畫面又出現了」，
+ *    完全不知道發生什麼事——多數人的第一個反應是「系統壞了」，
+ *    而不是「我離開太久了」。
+ *
+ * ⚠️ 讀完就把網址上的參數擦掉（history.replaceState）。留著的話
+ *    使用者按重新整理會再看到一次同樣的訊息，會以為又被登出了。
+ */
+function showBounceReason() {
+  let q = '';
+  try { q = new URLSearchParams(location.search).get('idle') ? 'idle'
+          : (new URLSearchParams(location.search).get('expired') ? 'expired' : ''); }
+  catch (e) { return; }
+  if (!q) return;
+
+  showMsg(t(q === 'idle' ? 'adm.msg.idleOut' : 'adm.msg.expiredOut'), 'info');
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* 舊瀏覽器就留著 */ }
+}
 
 
 /** 重新整理後，如果 token 還有效就直接進到對應的畫面 */

@@ -386,6 +386,29 @@ a { color: var(--action); }
 .entry .entry-title { font-size: var(--fs-lg); font-weight: 700; }
 .entry .entry-desc { color: var(--text-muted); font-size: var(--fs-sm); }
 
+/* 使用者入口的說明清單（v2.8）。
+   ⚠️ 這一整塊在 <a> 裡面，所以**不要放任何可以點的東西**（連結、按鈕）——
+      <a> 裡面再放一個 <a> 是無效的 HTML，瀏覽器會自己把它拆開，
+      拆出來的結果各家不一樣，而且畫面上看不出哪裡壞了。 */
+.entry .entry-list {
+  margin: 10px 0 0;
+  padding-left: 1.15em;                /* 圓點縮在文字左邊，不要凸出卡片 */
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+.entry .entry-list li { margin-bottom: 4px; }
+.entry .entry-list li::marker { color: var(--action); }
+
+/* 「只查得到今天以後」這一條。它是**限制**不是功能，所以跟上面的清單
+   分開、用不同的顏色——混在清單裡的話會被當成第四項功能讀過去。 */
+.entry .entry-note {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
 
 /* ===== 表單 ===== */
 
@@ -1067,6 +1090,46 @@ select {
 
 /* ⚠️ 斷點一律寫成 @media screen and (...)。少了 screen 的話，
    A4 扣掉邊界約 703px 會誤觸發手機版排版，印出來變成窄窄一條。 */
+/* ===== 閒置警告條（v2.8）=====
+   閒置快到期時貼在畫面底部。
+
+   ⚠️ 固定在**底部**不是頂部：頂部是頂列與導覽列的位置，蓋上去會擋住
+      返回鍵；而手機上大拇指本來就在下面，「繼續使用」按得到才有意義。
+
+   ⚠️ z-index 要夠高。它蓋不過去的話，使用者會看到一條被切掉一半的
+      警告，然後在沒有任何預告的情況下被登出。 */
+.idlebar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;                      /* 窄螢幕時按鈕自己掉到第二行 */
+  gap: 10px;
+  padding: 10px var(--gap);
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));   /* iPhone 的home 橫條 */
+  background: var(--warn-bg);
+  border-top: 1px solid var(--warn-border);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, .08);
+}
+.idlebar button {
+  flex: 0 0 auto;
+  min-height: var(--tap-min);
+  padding: 0 18px;
+  border: 1px solid var(--action);
+  border-radius: var(--radius-sm);
+  background: var(--action);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
 @media print {
   :root {
     --fs-xs: 11px; --fs-sm: 12px; --fs-body: 13px;
@@ -1074,7 +1137,7 @@ select {
     --gap: 10px; --pad-card: 12px; --sec-gap: 18px;
   }
   body { background: #fff; }
-  .topbar, .tabs, .btn, .foot { display: none; }
+  .topbar, .tabs, .btn, .foot, .idlebar { display: none; }
   .booking { break-inside: avoid; box-shadow: none; }
 
   /* 班表列表：印出來就是一張純表格。
