@@ -52,11 +52,17 @@ const I18N = {
 
     'status.SCHEDULED': 'Terjadwal',
     'status.DONE':      'Selesai',
+    'status.INCOMPLETE':'Belum Lengkap',
+    'status.PENDING':   'Menunggu Jadwal',
+    /* ⚠️ v2.9 起退役，但**不可以刪掉**——搬遷刻意不動的那些列還帶著它。
+       刪了的話那幾筆會顯示成 'status.POSTPONED' 這串原始的 key。 */
     'status.POSTPONED': 'Diundur',
-    'status.PENDING':   'Menunggu',
     'status.CANCELLED': 'Batal',
+    'list.overdue':     'Lewat tanggal',
+    'list.overdueN':    '⚠ {n} lewat tanggal',
 
     'f.pending':   'Tanggal belum ditentukan, hubungi bagian GA',
+    'f.incomplete':'Data belum lengkap, hubungi bagian GA',
     'f.asal':      'Semula',
     'f.flight':    'NO Pesawat',
     'f.etd':       'Jam pesawat',
@@ -246,7 +252,7 @@ const I18N = {
     'home.query.p1':    '用電子郵件查：自己的接送安排，以及共用同一個信箱的家屬。',
     'home.query.p2':    '用航班日期或航班號查：跟你同一班飛機的還有誰。',
     'home.query.p3':    '查得到的內容：日期、出廠時間、上車地點、航班號。',
-    'home.query.note':  '只查得到今天以後的行程。已經過去的行程請洽總務。',
+    'home.query.note':  '只查得到今天以後的行程。已經過去的行程請洽窗口。',
     'home.admin.title': '管理者專區',
     'home.admin.desc':  '新增、修改、刪除接送資料（需要帳號密碼）',
 
@@ -276,11 +282,17 @@ const I18N = {
 
     'status.SCHEDULED': '已排定',
     'status.DONE':      '已完成',
+    'status.INCOMPLETE':'待定',
+    'status.PENDING':   '待改期',
+    /* ⚠️ v2.9 起退役，但**不可以刪掉**——搬遷刻意不動的那些列還帶著它。
+       刪了的話那幾筆會顯示成 'status.POSTPONED' 這串原始的 key。 */
     'status.POSTPONED': '已改期',
-    'status.PENDING':   '待定',
     'status.CANCELLED': '已取消',
+    'list.overdue':     '逾期未處理',
+    'list.overdueN':    '⚠ 逾期未處理 {n} 筆',
 
-    'f.pending':   '日期待定，請洽總務',
+    'f.pending':   '日期待定，請洽窗口',
+    'f.incomplete':'資訊未齊，請洽窗口',
     'f.asal':      '原訂',
     'f.flight':    '航班號',
     'f.etd':       '起降時間',

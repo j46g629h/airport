@@ -496,12 +496,41 @@ function render() {
 function th(key) { return '<th>' + esc(t(key)) + '</th>'; }
 
 
+/**
+ * 「逾期未處理」＝ 日期已經過了，狀態卻還是待定或待改期（v2.9）。
+ *
+ * 為什麼要標出來：這兩種狀態的意思都是「這一筆還沒有定案」，
+ * 而定案的人就是管理者本人。日期一過還停在這裡，代表**有一件事被忘記了**——
+ * 它不會自己冒出來提醒你，混在幾十筆裡面很容易整週都沒被看到。
+ *
+ * ⚠️ 「已排定」不算逾期。時間過了它會自己變成「已完成」
+ *    （effectiveStatus_，後端每小時也會寫回 Sheet），那是正常的流程。
+ * ⚠️ 「已取消」也不算——那是已經定案的決定。
+ *
+ * ⚠️ 「今天」一定要換算成雅加達（todayJakarta），不可以直接用裝置日期。
+ *    台灣的手機比雅加達快一小時，台北 00:30 時雅加達還在前一天 23:30——
+ *    那一個小時裡，昨天的行程會被誤判成還沒到期，而畫面上完全看不出哪裡不對。
+ */
+function isOverdue(it) {
+  const st = it.status || '';
+  if (st !== 'PENDING' && st !== 'INCOMPLETE') return false;
+  if (!it.tanggal_iso) return false;
+  return it.tanggal_iso < isoOf(todayJakarta());     // 'YYYY-MM-DD' 字串比較就是日期比較
+}
+
+
 function renderStatLine() {
   const pick = viewItems.filter(function (i) { return i.arah === 'PICKUP'; }).length;
   const drop = viewItems.filter(function (i) { return i.arah === 'DROPOFF'; }).length;
-  document.getElementById('statLine').textContent =
+  const late = viewItems.filter(isOverdue).length;
+  const el = document.getElementById('statLine');
+  el.textContent =
     t('list.countOf', { n: viewItems.length, total: allItems.length }) +
-    '　' + t('list.stat', { a: pick, b: drop });
+    '　' + t('list.stat', { a: pick, b: drop }) +
+    // 0 筆的時候整段不出現。永遠掛一個「逾期 0」在那裡，
+    // 看久了就變成背景，真的有 1 筆時也不會被注意到
+    (late ? '　' + t('list.overdueN', { n: late }) : '');
+  el.classList.toggle('statline--alert', late > 0);
 }
 
 
@@ -527,6 +556,8 @@ function rowHtml(it) {
   const cls = ['drow'];
   cls.push(arah === 'PICKUP' ? 'drow--pickup' : 'drow--dropoff');
   if (status === 'CANCELLED') cls.push('drow--cancelled');
+  const overdue = isOverdue(it);
+  if (overdue) cls.push('drow--overdue');
 
   const arahTag = '<span class="booking-arah ' +
     (arah === 'PICKUP' ? 'arah--pickup' : 'arah--dropoff') + '">' +
@@ -534,6 +565,10 @@ function rowHtml(it) {
 
   let statusTag = '<span class="badge badge--' + status.toLowerCase() + '">' +
                   esc(t('status.' + status)) + '</span>';
+  // 逾期的再加一顆紅標。整列的底色已經變了，但**列印出來是黑白的**——
+  // 只靠顏色的話，印成紙本拿去開會時這件事就消失了
+  if (overdue) statusTag += '<span class="badge badge--overdue">' +
+                            esc(t('list.overdue')) + '</span>';
   // 畫面算出來的狀態跟 Sheet 上存的不一樣時要標出來（例如飛機飛走了但 Sheet 還寫已排定）。
   // 不標的話，管理者對照 Sheet 會以為其中一邊是錯的
   if (it.status_raw && it.status_raw !== status) {

@@ -13,7 +13,7 @@ var SYSTEM_INFO = {
      前端頂列顯示的是短名（js/i18n.js 的 app.name），因為那裡旁邊
      就是 PCI GA 的標誌，再寫一次 PCI 是重複的，還會把系統名擠掉。 */
   name: 'PCI 機場接送系統',
-  version: '2.8',
+  version: '2.9',
   timezone: 'Asia/Jakarta',
   locale: 'id_ID'
 };
@@ -128,8 +128,27 @@ var MAX_NEW_WEEK_SHEETS_PER_RUN = 6;
  *    而且原始 airport.xls 本來就只寫 Jemput / Antar。
  */
 var LIST_ARAH   = ['Jemput', 'Antar'];
-var LIST_STATUS = ['Terjadwal 已排定', 'Selesai 已完成', 'Diundur 已改期',
-                   'Menunggu 待定', 'Batal 已取消'];
+/**
+ * ⚠️ v2.9 改版。新舊對應與**為什麼**這樣配，一次講清楚：
+ *
+ *   舊「Menunggu 待定」  → 新「Menunggu Jadwal 待改期」
+ *        代碼仍然是 PENDING，**一個字都沒改到程式行為**。
+ *        因為舊「待定」在程式裡的意思本來就是「要改期、新日期還沒定」，
+ *        那正是新「待改期」要的行為（使用者端藏日期）。
+ *        沿用代碼＝這次搬遷只換 Sheet 上顯示的字，風險最低。
+ *
+ *   新增「Belum Lengkap 待定」→ 代碼 INCOMPLETE
+ *        意思是**資訊不完整**：航班日期未定、航班號未定都算。
+ *        ⚠️ 即使日期未定，A 欄**還是要填一個暫定日期**——A 欄決定這一筆
+ *           放在哪一張週分頁，空白的話它會從系統裡消失（設計約定第 1 條）。
+ *           使用者端不會看到那個暫定日期，只看到「資訊未齊，請洽窗口」。
+ *
+ *   舊「Diundur 已改期」→ 退役
+ *        它的資訊（原訂日期）本來就該由 W 欄表達，用狀態表達是重複的。
+ *        搬遷會在 W 欄有值時把它轉成「已排定」；W 欄空白的不動，列進報告。
+ */
+var LIST_STATUS = ['Terjadwal 已排定', 'Selesai 已完成',
+                   'Belum Lengkap 待定', 'Menunggu Jadwal 待改期', 'Batal 已取消'];
 var LIST_YESNO  = ['YES', 'NO'];
 var LIST_YATIDAK = ['Ya 是', 'Tidak 否'];
 var LIST_TIPE   = ['Karyawan 員工', 'Keluarga 眷屬', 'Tamu 訪客'];
@@ -144,9 +163,15 @@ var CODE_OF = {
   'Antar 送機':       'DROPOFF',
   'Terjadwal 已排定': 'SCHEDULED',
   'Selesai 已完成':   'DONE',
+  'Belum Lengkap 待定':     'INCOMPLETE',
+  'Menunggu Jadwal 待改期': 'PENDING',
+  'Batal 已取消':     'CANCELLED',
+  /* ↓ v2.9 之前的寫法。migrateStatusLabels() 跑完 Sheet 上就不會再有，
+       但這兩行**不可以拿掉**：① 搬遷刻意不動的那些「已改期」還在
+       ② 日後有人從舊檔案貼資料進來，程式照樣讀得懂，不會變成未知值
+          而整批被健檢報成異常 */
   'Diundur 已改期':   'POSTPONED',
   'Menunggu 待定':    'PENDING',
-  'Batal 已取消':     'CANCELLED',
   'Karyawan 員工':    'STAFF',
   'Keluarga 眷屬':    'FAMILY',
   'Tamu 訪客':        'GUEST',

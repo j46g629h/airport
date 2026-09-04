@@ -1086,10 +1086,48 @@ select {
 }
 
 
-/* ===== 列印 ===== */
+/* ===== 逾期未處理（v2.9）=====
+   日期已經過了，狀態卻還停在「待定」或「待改期」——代表有一件事被忘記了。
 
-/* ⚠️ 斷點一律寫成 @media screen and (...)。少了 screen 的話，
-   A4 扣掉邊界約 703px 會誤觸發手機版排版，印出來變成窄窄一條。 */
+   ⚠️ **不可以動左邊那條色帶。** 那條是接／送的區分（綠＝接、藍＝送），
+      拿來標逾期的話就換掉了一個每一列都在用的資訊，
+      得到一個少數列才用得到的資訊——這筆交換是虧的。
+      所以逾期改用「整列底色 ＋ 外框 ＋ 一顆紅標」。
+
+   ⚠️ 三種訊號一起上是刻意的：底色在滑動時抓得住眼睛、外框在白底上分得出來、
+      而**紅標是列印出來唯一還在的那一個**（紙本是黑白的，底色印出來幾乎看不見）。
+
+   ⚠️ 這一段一定要放在上面 760px 卡片區塊**之後**，而且選擇器要對得上
+      （`.dtable tr.drow--overdue` 對上 `.dtable tr.drow`）。
+      權重不夠或位置在前，都會被 `.dtable tr.drow{background:var(--surface)}`
+      蓋掉——而且畫面正常、沒有錯誤訊息，只是「顏色沒出現」。 */
+.drow--overdue td { background: var(--danger-bg); }
+
+.badge--overdue {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  font-weight: 700;
+}
+
+/* 統計行有逾期時整行變色。捲到下面看資料時，這一行還在上面提醒。
+
+   ⚠️ 選擇器要寫成 `.count.statline--alert`（兩個 class，權重 0,2,0），
+      不能只寫 `.statline--alert`（0,1,0）——它會輸給上面的
+      `.listbar .count { color: var(--text-muted) }`（也是 0,2,0，但權重比 0,1,0 高）。
+      而且輸掉的樣子是「class 掛上去了、顏色沒變」，畫面正常、沒有錯誤訊息。 */
+.count.statline--alert { color: var(--danger); font-weight: 700; }
+
+@media screen and (max-width: 760px) {
+  .dtable tr.drow--overdue {
+    background: var(--danger-bg);
+    border-color: var(--danger-border);
+  }
+  /* 左邊那條保持接／送的顏色，只有其餘三邊變紅 */
+  .dtable tr.drow--overdue.drow--pickup  { border-left-color: var(--ok) !important; }
+  .dtable tr.drow--overdue.drow--dropoff { border-left-color: var(--info) !important; }
+}
+
 /* ===== 閒置警告條（v2.8）=====
    閒置快到期時貼在畫面底部。
 
@@ -1130,6 +1168,10 @@ select {
   cursor: pointer;
 }
 
+/* ===== 列印 ===== */
+
+/* ⚠️ 斷點一律寫成 @media screen and (...)。少了 screen 的話，
+   A4 扣掉邊界約 703px 會誤觸發手機版排版，印出來變成窄窄一條。 */
 @media print {
   :root {
     --fs-xs: 11px; --fs-sm: 12px; --fs-body: 13px;

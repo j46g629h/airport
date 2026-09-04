@@ -113,8 +113,12 @@ function checkData() {
       else if (['PICKUP', 'DROPOFF'].indexOf(codeOf_(arah)) < 0) {
         issues.push(['🟡 接／送是未知值', where + '　' + who + '：「' + arah + '」']);
       }
+      /* ⚠️ POSTPONED（已改期）v2.9 起退役，但白名單**要留著**——
+         搬遷刻意不動的那些列還帶著它，拿掉的話它們會整批被報成
+         「狀態是未知值」，真正的問題就被淹沒在噪音裡了。 */
       var st = g(row, 'status');
-      if (st && ['SCHEDULED', 'DONE', 'POSTPONED', 'PENDING', 'CANCELLED'].indexOf(codeOf_(st)) < 0) {
+      if (st && ['SCHEDULED', 'DONE', 'INCOMPLETE', 'PENDING',
+                 'POSTPONED', 'CANCELLED'].indexOf(codeOf_(st)) < 0) {
         issues.push(['🟡 狀態是未知值', where + '　' + who + '：「' + st + '」']);
       }
 

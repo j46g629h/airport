@@ -200,7 +200,13 @@ function renderResult(data) {
 function bookingCard(it) {
   const arah = it.arah || '';
   const status = it.status || 'SCHEDULED';
+  /* 兩種狀態要把日期藏起來（v2.9）：
+       PENDING    待改期——要改期，新日期還沒定
+       INCOMPLETE 待定——資訊不完整，畫面上那個日期只是暫定的
+     ⚠️ 後端已經把日期清空了（gas/Query.js），這裡只是決定改顯示哪一句。
+        兩層都要做：後端不清的話，關掉 JavaScript 直接看 API 回應就露出來了。 */
   const isPending = (status === 'PENDING');
+  const isIncomplete = (status === 'INCOMPLETE');
 
   const cls = ['booking'];
   cls.push(arah === 'PICKUP' ? 'booking--pickup' : 'booking--dropoff');
@@ -209,7 +215,8 @@ function bookingCard(it) {
   // 標題列：日期 + 接/送 + 狀態徽章
   let head = '<div class="booking-top">';
   head += '<span class="booking-date">' +
-          esc(isPending ? t('f.pending') : (it.tanggal || '')) + '</span>';
+          esc(isIncomplete ? t('f.incomplete')
+              : (isPending ? t('f.pending') : (it.tanggal || ''))) + '</span>';
   head += '<span class="booking-arah ' + (arah === 'PICKUP' ? 'arah--pickup' : 'arah--dropoff') + '">' +
           esc(t('arah.' + arah)) + '</span>';
   if (status !== 'SCHEDULED') {
@@ -224,7 +231,10 @@ function bookingCard(it) {
 
   // 欄位。空的一律不顯示——留一排「—」只是噪音
   const rows = [];
-  if (status === 'POSTPONED' && it.tanggal_asal) row(rows, t('f.asal'), it.tanggal_asal);
+  /* ⚠️ 「原訂 …」看的是 W 欄有沒有值，**不看狀態**（v2.9）。
+     「已改期」這個狀態退役了，改期的事實由 W 欄表達——
+     綁在狀態上的話，搬遷之後那些改過期的資料就再也不會顯示原訂日期。 */
+  if (it.tanggal_asal) row(rows, t('f.asal'), it.tanggal_asal);
   if (it.pickup)       row(rows, t('f.pickup'), it.pickup, true);
   else if (it.dari_pci) row(rows, t('f.pickup'), it.dari_pci, true);
   if (it.titik_jemput) row(rows, t('f.titik'), it.titik_jemput);

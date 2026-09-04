@@ -119,7 +119,12 @@ function filterForUser_(index, match) {
  *    傳 ISO 讓前端自己轉的話，台灣的手機會用台北時區多算一小時。
  */
 function toPublicItem_(r) {
-  var pending = (r.status_code === 'PENDING');
+  /* 使用者端要把日期與出車資訊藏起來的兩種狀態（v2.9）：
+       PENDING    待改期——要改期，新日期還沒定
+       INCOMPLETE 待定——資訊不完整（A 欄那個是暫定日期，不是真的）
+     ⚠️ 兩種都**一定要藏**。露出來的話使用者會照那個日期去等車，
+        而那台車根本不會來——這比「查不到」嚴重得多。 */
+  var hide = (r.status_code === 'PENDING' || r.status_code === 'INCOMPLETE');
   // ⚠️ 用「算出來的」狀態，不是 Sheet 上存的那個。
   //    Sheet 上的狀態要靠人維護，時間過了不會自己變；
   //    Status.js 的排程每小時會把它寫回去，但那有最多一小時的落差，
@@ -129,13 +134,13 @@ function toPublicItem_(r) {
   return {
     id:          r.booking_id,
     // 待定的不給日期，只給狀態（規則 3）
-    tanggal:     pending ? '' : isoToDisplay_(r.tanggal_iso),
+    tanggal:     hide ? '' : isoToDisplay_(r.tanggal_iso),
     arah:        r.arah_code,                       // PICKUP / DROPOFF，文字由前端依語言決定
     status:      status,
     flight:      r.flight,
     etd_eta:     r.etd_eta,
-    dari_pci:    pending ? '' : r.dari_pci,
-    pickup:      pending ? '' : isoToDisplayTime_(r.pickup_iso),
+    dari_pci:    hide ? '' : r.dari_pci,
+    pickup:      hide ? '' : isoToDisplayTime_(r.pickup_iso),
     tanggal_asal: r.tanggal_asal ? isoToDisplay_(r.tanggal_asal) : '',
 
     name:        r.name,

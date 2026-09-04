@@ -30,6 +30,11 @@ function onOpen(e) {
       .addItem('修復週分頁（認養 + 補格式）', 'menuRepairWeekSheets')
       .addItem('重設名冊的重複標示', 'menuPersonHighlight')
       .addItem('整理人員名冊欄位（移除退役欄）', 'menuTidyPersonColumns')
+      .addSeparator()
+      /* ⚠️ 順序就是給人看的操作順序：先試跑、看過報告，再執行。
+         把「執行」放在「試跑」前面的話，總有一天有人會直接按到下面那個。 */
+      .addItem('① 試跑：狀態標籤搬遷（不會寫入）', 'menuPreviewMigrateStatus')
+      .addItem('② 執行：狀態標籤搬遷', 'menuMigrateStatus')
       .addToUi();
   } catch (err) {
     Logger.log('建立選單失敗：' + err.message);
@@ -129,6 +134,32 @@ function menuTidyPersonColumns() {
   lines.push(dropRetiredPersonColumns_());
   lines.push(setupPersonHighlight_());
   showReport_('整理人員名冊欄位', lines.join('\n'));
+}
+
+
+/**
+ * 狀態標籤搬遷（v2.9）。試跑與執行分成兩個選單項目。
+ *
+ * ⚠️ 執行前**一定要二次確認**。這一支會改寫週分頁上的實際資料，
+ *    而它出錯的樣子不是跳錯誤訊息，是安靜地改掉一堆不該改的東西，
+ *    很久以後才會被發現。多按一次「確定」的成本，遠低於那個。
+ *
+ * ⚠️ 重複執行是安全的——每一條規則都只認舊值。而你**會**需要跑第二次：
+ *    第一次跑完，那些 W 欄（原訂日期）空白的「已改期」不會被動到；
+ *    補完 W 欄再跑一次，它們就會轉成「已排定」。
+ */
+function menuPreviewMigrateStatus() {
+  showReport_('試跑：狀態標籤搬遷', previewMigrateStatus());
+}
+
+function menuMigrateStatus() {
+  var ui = SpreadsheetApp.getUi();
+  var ans = ui.alert('執行狀態標籤搬遷',
+    '這會改寫週分頁上的 STATUS 欄。\n\n' +
+    '⚠️ 執行之前請先跑過「① 試跑」，並看過它列出來的清單。\n\n' +
+    '要繼續嗎？', ui.ButtonSet.YES_NO);
+  if (ans !== ui.Button.YES) return;
+  showReport_('狀態標籤搬遷', migrateStatusLabels());
 }
 
 
