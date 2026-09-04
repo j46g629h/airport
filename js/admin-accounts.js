@@ -241,8 +241,12 @@ function tAccountError(res) {
   const code = res && res.error;
   switch (code) {
     case 'FIELD_REQUIRED':      return t('adm.err.required');
-    case 'ACCOUNT_NOT_EMAIL':   return t('acc.err.notEmail');
-    case 'EMAIL_NOT_VALID':     return t('acc.err.notEmail');
+    case 'ACCOUNT_INVALID':     return t('acc.err.badAccount');
+    // v2.4 以前的舊代碼。後端已經不會再回它了，留著是為了部署空窗期——
+    // 前端先上線、後端還沒 redeploy 的那幾分鐘，舊代碼還會回來
+    case 'ACCOUNT_NOT_EMAIL':   return t('acc.err.badAccount');
+    case 'EMAIL_NOT_VALID':     return t('acc.err.badEmail');
+    case 'EMAIL_NOTIF_REQUIRED':return t('acc.err.notifReq');
     case 'ACCOUNT_EXISTS':      return t('acc.err.exists');
     case 'ACCOUNT_NOT_FOUND':   return t('acc.err.notFound');
     case 'CANNOT_DISABLE_SELF': return t('acc.guard.self');

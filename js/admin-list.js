@@ -44,22 +44,43 @@ let pendingSelects = null;
 
 /* ══════════════════ 初始化 ══════════════════ */
 
-document.addEventListener('DOMContentLoaded', async function () {
+document.addEventListener('DOMContentLoaded', function () {
   initLangSwitch();
 
   setApiRetryNotice(function () { showMsg(t('err.retrying'), 'info'); });
 
   wireEvents();
 
-  const profile = await requireLogin();
-  if (!profile) return;                       // requireLogin 已經在導頁了
+  // 連 token 都沒有就不必發 API，直接回登入頁
+  if (!getToken()) { location.href = 'admin.html'; return; }
 
-  document.getElementById('content').hidden = false;
-
-  // 存過條件就照他上次的，沒有就給預設區間（今天起未來 14 天）
-  if (!restoreFilters()) setQuickRange('next14');
+  /* ⚠️ 篩選條件要在發 API **之前**準備好——loadData() 是讀
+     #fFrom / #fTo 的值去查的。先前這兩行排在 requireLogin() 後面，
+     所以查資料只能等驗證回來才開始。它們其實完全不需要等。 */
+  if (!restoreFilters()) setQuickRange('next14');   // 沒存過就給今天起未來 14 天
   syncPickedDates();
 
+  /* ⚠️ 畫面立刻顯示，不要等驗證回來（那是 3~8 秒的空白）。
+     使用者這段時間就看得到篩選條件、可以先調，資料區顯示骨架。 */
+  document.getElementById('content').hidden = false;
+
+  /* ── 兩支 API 同時發（v2.5）────────────────────────────────
+   *
+   * 先前是串起來等的：
+   *     await requireLogin();   // 3~8 秒
+   *     loadData();             // 再 3~8 秒
+   *   → 合計 6~16 秒，而 Apps Script 的冷啟動就是這麼久，省不掉。
+   *
+   * 但這兩件事**互不相依**：查資料本身就會驗 token（後端的 withAuth），
+   * requireLogin 只是為了拿到姓名／角色並在失效時導頁。
+   * 同時發之後，總時間變成兩者的**最大值**而不是總和。
+   *
+   * ⚠️ 不要 await 它們。這裡刻意不等——各自處理各自的結果就好，
+   *    誰先回來誰先更新畫面。
+   * ⚠️ token 失效時兩支都會失敗：listBookings 會先閃一下錯誤訊息，
+   *    接著 requireLogin 把人導回登入頁。順序不保證，但結果一樣是導頁。
+   */
+  requireLogin();
   loadData();
 });
 
@@ -580,8 +601,15 @@ function detailRowHtml(it, id, open) {
   kv(rows, t('f.sopir'), it.sopir);
   kv(rows, t('f.hpSopir'), it.hp_sopir);
   kv(rows, t('f.updated'), it.updated_at);
-  kv(rows, t('f.booking'), it.id);
-  kv(rows, t('f.sheet'), it.sheet_name ? (it.sheet_name + '　' + it.row_num) : '');
+
+  /* ⚠️ booking_id 與「分頁位置」刻意**不顯示**（v2.5，使用者要求）。
+   *
+   * 資料**沒有被拿掉**，只是列表上不畫出來——階段 2d 的修改／刪除
+   * 要靠 it.id 認出是哪一筆（設計約定：一律用 id 查找，不可用列號）。
+   * 2d 的修改畫面上會顯示編號：動別人的資料之前，先確認「我改的是這一筆」。
+   *
+   * i18n 的 f.booking / f.sheet 兩句也留著，2d 就要用。
+   */
 
   return '<tr class="drow-detail" data-for="' + esc(id) + '"' + (open ? '' : ' hidden') + '>' +
          '<td colspan="8"><dl class="kv">' + rows.join('') + '</dl></td></tr>';

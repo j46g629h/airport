@@ -92,8 +92,25 @@ function adminOpCreate_(params, session) {
   var emailNotif = str_(params.email_notif).toLowerCase();
 
   if (!account || !name) return fail_('FIELD_REQUIRED');
-  if (!looksLikeEmail_(account)) return fail_('ACCOUNT_NOT_EMAIL');
+  if (!looksLikeAccount_(account)) return fail_('ACCOUNT_INVALID');
   if (emailNotif && !looksLikeEmail_(emailNotif)) return fail_('EMAIL_NOT_VALID');
+
+  /* ⚠️ 這一條是 v2.5 放寬帳號格式的**必要配套**，不是可有可無的檢查。
+   *
+   * 「忘記密碼」的臨時密碼是這樣決定收件人的（gas/Auth.js）：
+   *
+   *     var to = str_(admin.email_notif) || str_(admin.account);
+   *
+   * 帳號還是 email 的年代，通知信箱空著也沒關係——寄到帳號本身就好。
+   * 現在帳號可以是 `ga2` 這種東西，兩個都空的話 MailApp.sendEmail('ga2', ...)
+   * 會丟例外，而那個呼叫是包在 try/catch 裡的：
+   * **畫面會說「已寄出」，但信永遠不會到，也不會有任何錯誤訊息。**
+   *
+   * 所以在建立帳號的當下就擋住，不要留一個「等到有人忘記密碼那天才爆」的洞。
+   * 超管自己還有 emergencyResetSuper() 當救命繩，一般管理者沒有。
+   */
+  if (!looksLikeEmail_(account) && !emailNotif) return fail_('EMAIL_NOTIF_REQUIRED');
+
   if (findAdminByAccount_(account)) return fail_('ACCOUNT_EXISTS');
 
   var lock = LockService.getScriptLock();
@@ -285,4 +302,21 @@ function countActiveSupers_() {
 
 function looksLikeEmail_(s) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str_(s));
+}
+
+/**
+ * 帳號的格式規則（v2.5 起**不再限定必須是 email**）。
+ *
+ * 允許：英文字母、數字、`.` `_` `-` `@`，長度 3~64。
+ * 所以 `ga2`、`ken.wang`、`ken@pci.co.id` 都可以。
+ *
+ * ⚠️ **不可以完全不驗證。** 帳號比對是 `toLowerCase()` 之後逐字比的，
+ *    一旦允許空白或控制字元，就會出現「看起來一模一樣但登入不了」的帳號——
+ *    那種問題查起來非常痛苦，因為畫面上兩個字串長得完全相同。
+ *
+ * ⚠️ 大小寫不敏感（建立與登入都會先 toLowerCase），所以 `Ken` 和 `ken`
+ *    是同一個帳號，建立時會被 ACCOUNT_EXISTS 擋下來。
+ */
+function looksLikeAccount_(s) {
+  return /^[A-Za-z0-9._@-]{3,64}$/.test(str_(s));
 }

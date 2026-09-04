@@ -270,6 +270,24 @@ function requestPasswordReset(params) {
   var to = str_(admin.email_notif) || str_(admin.account);
   var minutes = Math.round(AUTH.TEMP_PASSWORD_TTL / 60);
 
+  /* ⚠️ 第二道防線（v2.5）。
+   *
+   * 帳號自 v2.5 起不必是 email，收件人就可能是 `ga2` 這種寄不出去的字串。
+   * 建立帳號時已經擋過一次（gas/Admins.js 的 EMAIL_NOTIF_REQUIRED），
+   * 但**超管可以直接在 Sheet 上把通知信箱清掉**，那道防線就繞過去了。
+   *
+   * 這裡先檢查再寄，是為了讓日誌說得出**真正的原因**。
+   * 不檢查的話下面的 catch 只會記到 MailApp 的例外訊息
+   * （「Invalid email」之類），看不出是「這個帳號根本沒有可寄的地址」。
+   * 階段 4 的每日系統信會把 LOG 送到管理者眼前，訊息說得越準越有用。
+   */
+  if (!looksLikeEmail_(to)) {
+    logError_('requestPasswordReset', '沒有可寄送的信箱',
+              account + '：帳號不是 email，而 ADMIN 分頁的 email_notif 是空的。' +
+              '請在 ADMIN 分頁補上通知信箱，或改用 emergencyResetSuper()。');
+    return pretendOk;
+  }
+
   try {
     MailApp.sendEmail(to,
       '[' + SYSTEM_INFO.name + '] 臨時密碼 / Kata sandi sementara',

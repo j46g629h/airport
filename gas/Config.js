@@ -13,7 +13,7 @@ var SYSTEM_INFO = {
      前端頂列顯示的是短名（js/i18n.js 的 app.name），因為那裡旁邊
      就是 PCI GA 的標誌，再寫一次 PCI 是重複的，還會把系統名擠掉。 */
   name: 'PCI 機場接送系統',
-  version: '2.4',
+  version: '2.5',
   timezone: 'Asia/Jakarta',
   locale: 'id_ID'
 };

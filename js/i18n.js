@@ -78,7 +78,6 @@ const I18N = {
     'err.dateReq':    'Silakan pilih tanggal.',
     'err.dateInvalid':'Tanggal tidak valid.',
     'err.flightReq':  'Silakan masukkan NO Pesawat.',
-
     'nav.home':     'Beranda',
     'foot.by':      'Dikelola oleh',
     'foot.ext':     'Ext',
@@ -133,11 +132,12 @@ const I18N = {
     'acc.done':         'Berhasil.',
     'acc.create.toggle':'+ Akun baru',
     'acc.create.submit':'Buat akun',
-    'acc.new.account':  'Akun (email)',
+    'acc.new.account':  'Akun',
+    'acc.new.accountHint':'Boleh email atau nama pendek, mis. ga2 atau ken.wang.',
     'acc.new.name':     'Nama',
     'acc.new.role':     'Peran',
     'acc.new.emailNotif':'Email notifikasi',
-    'acc.new.emailNotifHint':'Kosongkan jika sama dengan akun. Kata sandi sementara hanya dikirim ke sini.',
+    'acc.new.emailNotifHint':'Wajib diisi kalau akun bukan alamat email — ke sinilah kata sandi sementara dikirim kalau lupa sandi.',
     'acc.act.reset':    'Reset sandi',
     'acc.act.disable':  'Nonaktifkan',
     'acc.act.enable':   'Aktifkan',
@@ -153,7 +153,9 @@ const I18N = {
     'acc.confirm.toSuper': 'Jadikan {name} Super Admin? Dia akan bisa mengelola semua akun.',
     'acc.confirm.toAdmin': 'Turunkan {name} menjadi Admin biasa?',
     'acc.confirm.remove':  'HAPUS akun {account} secara permanen? Untuk karyawan yang keluar, sebaiknya pakai "Nonaktifkan" agar riwayat tetap terbaca.',
-    'acc.err.notEmail': 'Akun harus berupa alamat email yang valid.',
+    'acc.err.badAccount': 'Akun hanya boleh huruf, angka, dan . _ - @ (3-64 karakter).',
+    'acc.err.badEmail':   'Format Email Notifikasi tidak valid.',
+    'acc.err.notifReq':   'Akun ini bukan email, jadi Email Notifikasi wajib diisi — ke sanalah kata sandi sementara dikirim kalau lupa sandi.',
     'acc.err.exists':   'Akun ini sudah ada.',
     'acc.err.notFound': 'Akun tidak ditemukan.',
     'acc.err.busy':     'Sedang sibuk, coba lagi sebentar.',
@@ -288,7 +290,6 @@ const I18N = {
     'err.dateReq':    '請選擇日期。',
     'err.dateInvalid':'日期格式不正確。',
     'err.flightReq':  '請輸入航班號。',
-
     'nav.home':     '回首頁',
     'foot.by':      '維護單位',
     'foot.ext':     '分機',
@@ -343,11 +344,12 @@ const I18N = {
     'acc.done':         '已完成。',
     'acc.create.toggle':'＋ 新增帳號',
     'acc.create.submit':'建立帳號',
-    'acc.new.account':  '帳號（電子郵件）',
+    'acc.new.account':  '帳號',
+    'acc.new.accountHint':'電子郵件或短名稱都可以，例如 ga2 或 ken.wang。',
     'acc.new.name':     '姓名',
     'acc.new.role':     '角色',
     'acc.new.emailNotif':'通知信箱',
-    'acc.new.emailNotifHint':'跟帳號相同就留空。臨時密碼只會寄到這裡。',
+    'acc.new.emailNotifHint':'帳號不是電子郵件時**必填**——忘記密碼的臨時密碼會寄到這裡。',
     'acc.act.reset':    '重設密碼',
     'acc.act.disable':  '停用',
     'acc.act.enable':   '啟用',
@@ -363,7 +365,9 @@ const I18N = {
     'acc.confirm.toSuper': '確定把 {name} 升為超級管理者嗎？他將能管理所有帳號。',
     'acc.confirm.toAdmin': '確定把 {name} 降為一般管理者嗎？',
     'acc.confirm.remove':  '確定要永久刪除帳號 {account} 嗎？人員離職請改用「停用」，這樣歷史操作紀錄才查得到是誰做的。',
-    'acc.err.notEmail': '帳號必須是有效的電子郵件。',
+    'acc.err.badAccount': '帳號只能用英文、數字和 . _ - @ ，長度 3～64 個字。',
+    'acc.err.badEmail':   '通知信箱的格式不正確。',
+    'acc.err.notifReq':   '這個帳號不是電子郵件，所以「通知信箱」必填——忘記密碼時臨時密碼會寄到那裡。',
     'acc.err.exists':   '這個帳號已經存在。',
     'acc.err.notFound': '查無此帳號。',
     'acc.err.busy':     '系統忙碌中，請稍後再試。',
@@ -477,6 +481,11 @@ function colon() { return currentLang === 'zh' ? '：' : ': '; }
 
 /** 後端回來的錯誤代碼 → 使用者看得懂的話 */
 function tError(code, detail) {
+  /* ⚠️ 這一支只服務**使用者端**（js/query.js）。
+     管理端的錯誤代碼走 js/admin-accounts.js 的 tAccountError
+     → js/admin-session.js 的 tAdminError，那邊已經翻好了。
+     不要在這裡再翻一份——同一個代碼兩份翻譯，改了一邊忘了另一邊，
+     使用者會看到兩種不同的說法，而且沒有人查得出為什麼。 */
   switch (code) {
     case 'EMAIL_REQUIRED':  return t('err.emailReq');
     case 'EMAIL_TOO_SHORT': return t('err.emailShort', { n: detail || 3 });
