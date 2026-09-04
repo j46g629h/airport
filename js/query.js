@@ -219,10 +219,18 @@ function bookingCard(it) {
               : (isPending ? t('f.pending') : (it.tanggal || ''))) + '</span>';
   head += '<span class="booking-arah ' + (arah === 'PICKUP' ? 'arah--pickup' : 'arah--dropoff') + '">' +
           esc(t('arah.' + arah)) + '</span>';
-  if (status !== 'SCHEDULED') {
-    head += '<span class="badge badge--' + status.toLowerCase() + '">' +
-            esc(t('status.' + status)) + '</span>';
-  }
+  /* 狀態一律顯示，**包含「已排定」**（v2.9.2，使用者要求）。
+   *
+   * 先前「已排定」是刻意不顯示的（想法是：預設值，畫出來只是噪音）。
+   * 但那個想法把使用者的處境想錯了——他打開這一頁是要確認
+   * 「我的車安排好了沒有」，而**沒有徽章不等於沒問題，只等於沒有訊息**。
+   * 一顆綠色的「已排定」是一句明確的回答：資訊齊了，照這個時間出來就好。
+   *
+   * ⚠️ 這顆徽章等於系統對使用者承諾「資訊都備齊了」，
+   *    所以資料健檢加了一條「已排定卻沒有出廠時間」的檢查（gas/Health.js），
+   *    讓管理者在使用者照著一個空的時間出來等車之前先看到。 */
+  head += '<span class="badge badge--' + status.toLowerCase() + '">' +
+          esc(t('status.' + status)) + '</span>';
   head += '</div>';
 
   const name = '<div class="booking-name">' + esc(it.name || '') +

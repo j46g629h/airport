@@ -107,6 +107,20 @@ function checkData() {
                      '」。當天出車寫 20:00，前一天寫 30/08 20:00（日在前）']);
       }
 
+      /* 4b.「已排定」卻沒有出廠時間（v2.9.2）
+         ⚠️ 這一條是配合使用者端開始顯示「已排定」徽章加的。
+            那顆徽章等於系統跟使用者說「資訊都備齊了，照這個時間出來」——
+            而出廠時間是空的話，他會查到一筆看起來一切正常、卻沒有時間可以照的行程。
+            這種列在 Sheet 上完全看不出異常（狀態欄寫著「已排定」），
+            所以只能靠健檢把它撈出來。
+         ⚠️ 只查未來的。過去的補不補都沒有意義，撈出來只會變成永遠清不掉的噪音。 */
+      var statusCode = codeOf_(g(row, 'status'));
+      if (statusCode === 'SCHEDULED' && !pci && tanggal >= today_()) {
+        issues.push(['🟡 已排定但沒有出廠時間', where + '　' + who + '：' +
+                     isoToDisplay_(isoDate_(tanggal)) +
+                     '。使用者端會顯示「已排定」，卻看不到幾點出車']);
+      }
+
       // 5. 接／送 與 狀態必須認得
       var arah = g(row, 'arah');
       if (!arah) issues.push(['🟡 沒有接／送', where + '　' + who]);

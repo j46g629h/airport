@@ -589,10 +589,17 @@ a { color: var(--action); }
   margin-left: auto;
 }
 
+/* ⚠️ **五個狀態每一個都要有一條規則。** 少寫一個不會報錯，
+   那顆徽章只會變成沒有顏色的灰框——在一整排彩色徽章裡看起來像壞掉，
+   而且完全看不出是「漏寫樣式」還是「本來就長這樣」。
+   加新狀態時，Config.js 的 LIST_STATUS 與這裡要一起改。 */
+.badge--scheduled { color: var(--ok);     background: var(--ok-bg);     border-color: var(--ok-border); }
 .badge--done      { color: var(--text-muted); background: var(--surface-alt); border-color: var(--border-strong); }
-.badge--postponed { color: var(--warn);   background: var(--warn-bg);   border-color: var(--warn-border); }
+.badge--incomplete{ color: var(--warn);   background: var(--warn-bg);   border-color: var(--warn-border); }
 .badge--pending   { color: var(--warn);   background: var(--warn-bg);   border-color: var(--warn-border); }
 .badge--cancelled { color: var(--danger); background: var(--danger-bg); border-color: var(--danger-border); }
+/* v2.9 起退役，但搬遷刻意不動的那些列還帶著它 */
+.badge--postponed { color: var(--warn);   background: var(--warn-bg);   border-color: var(--warn-border); }
 
 .booking-name {
   font-weight: 600;
