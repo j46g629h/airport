@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PCI GA 分頁圖示
+
+     ⚠️ 字母全部是幾何路徑，不用任何字型。
+        用 <text> + font-family 的話，SVG 會拿「觀看者自己電腦上的字型」來畫，
+        同一個圖示在 Windows / iPhone / Android 會長得不一樣。
+
+     ⚠️ 這裡只放 PCI 三個字母，不放 GA。分頁圖示實際顯示是 16px，
+        實測三個字母已經是極限，加到五個會糊成一團白色斑點。
+        完整的 PCI GA 放在 apple-touch-icon.png（180px，空間夠）。
+
+     ⚠️ 這個圖示與員工餐廳系統**共用**——PCI GA 是總務的識別，不是單一系統的。
+        兩個系統的區分靠標題文字，不靠圖示。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" rx="14" fill="#1A1A1C"/><g fill="none" stroke="#F2F2EF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 43 V21 H13.5 A6 6 0 0 1 13.5 33 H8.5"/><path d="M43.65 24.9 A7 11 0 1 0 43.65 39.1"/><path d="M55.5 21 V43"/></g></svg>

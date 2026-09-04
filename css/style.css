@@ -80,6 +80,37 @@
 
 html { -webkit-text-size-adjust: 100%; }
 
+/* ── 三條「一次擋掉一整類問題」的規則（v2.4）─────────────────────
+ *
+ * 逐頁調版面永遠調不完，這三條是從實際踩過的坑歸納出來的。
+ * 共同的症狀都是「畫面出現橫向捲動，但看不出是哪個元素造成的」。
+ *
+ * 1. 媒體元素預設用**自己的原始尺寸**。放一張比容器寬的圖就把整頁撐開。
+ *    這一版開始有 logo 與圖示，所以這條從「以防萬一」變成「一定要有」。
+ * 2. 沒有空格的長字串（email、備註裡貼上的網址、航班代碼串）不會自己換行，
+ *    會把卡片撐破。break-word 只在「這個字真的放不下」時才斷，
+ *    不像 anywhere 會把正常的句子也切得零零落落。
+ * 3. flex 子元素的 min-width 預設是 auto，意思是**不會縮到內容寬度以下**。
+ *    ⚠️ v2.4 修的頂列 bug 就是這一條：長標題不會自己截斷，
+ *       而是把語言切換整個擠出畫面。
+ */
+img, svg, video, canvas, table, pre { max-width: 100%; }
+
+.card, .entry, .booking, .drow, td, dd { overflow-wrap: break-word; }
+
+/* ⚠️ 第 3 條要**逐個列出容器**，不能只寫 .topbar。
+ *    min-width:auto 的預設值對每一個 flex／grid 子元素都成立，
+ *    而 overflow-wrap 救不了它——換行是「行」層級的事，
+ *    min-content 寬度是「格子」層級的事，格子撐開了就沒有行可以換。
+ *
+ *    實際抓到的兩個（v2.4 的版面檢查逼出來的，都是既有問題）：
+ *      .kv dd  —— 一個超長的 email 把「值」那一欄從 200px 撐到 490px，
+ *                 手機上詳細資料要左右滑才看得完
+ *      .dtable td —— 卡片模式下是 flex，姓名太長時右邊的廠別標籤被推出畫面
+ */
+.topbar > *,
+.kv > dt, .kv > dd { min-width: 0; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -123,12 +154,55 @@ a { color: var(--action); }
   border-bottom: 1px solid var(--border);
 }
 
+/**
+ * 標誌：純文字排的，沒有圖檔——跟員工餐廳系統同一個做法，也是同一個標誌
+ * （`PCI GA` 是總務的識別，不是單一系統的，所以兩個系統共用）。
+ *
+ * 文字排的好處：不用多一次網路請求、放大永遠銳利、深淺色自動跟著配色走。
+ * 圖檔要付出這三樣的相反面，換來的只是「可以畫得更複雜」——這裡不需要。
+ *
+ * ⚠️ **只有首頁有。** 內頁的人已經知道這是誰做的系統，他需要知道的是
+ *    「這是什麼」。320px 上的差別是看到「PCI GA」還是看到「機場接送系統」，
+ *    後者才回答得了他的問題。品牌識別沒有損失——favicon 在每一頁的 <head> 裡。
+ */
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  flex: 0 0 auto;                  /* 標誌不可以被壓縮，要縮的是標題 */
+}
+
+.wordmark b {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--text);
+}
+
+/* ⚠️ <i> 只是拿來把 GA 分出來，不是要斜體，所以要關掉 font-style。
+      白字黑底的小方塊跟 favicon 的圓角黑底是同一個形狀語言。 */
+.wordmark i {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--surface);
+  background: var(--action);
+  padding: 3px 5px;
+  border-radius: 5px;
+}
+
 .topbar .brand {
   font-weight: 700;
   font-size: var(--fs-lg);
-  margin-right: auto;
   text-decoration: none;
   color: var(--text);
+
+  /* ⚠️ 放不下就截斷，不要把右邊的語言切換擠出畫面。
+        min-width:0 是關鍵，見檔案上方「三條規則」的第 3 條。 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 返回鍵：有邊框的按鈕，不是純文字連結。
@@ -153,17 +227,50 @@ a { color: var(--action); }
 
 .backbtn:active { background: var(--border-strong); }
 
-/* 窄螢幕上把標題藏起來，優先保住「返回」和語言切換這兩個能操作的東西 */
+/**
+ * 窄螢幕的頂列取捨。
+ *
+ * ⚠️ 這一段先前的寫法同時造成兩個 bug（v2.4 修掉）：
+ *
+ *      .topbar .brand { display: none; }   ← ①
+ *      .backbtn { margin-right: auto; }    ← ②
+ *
+ *    ① 是為了內頁寫的（內頁三個元件塞不下），但**首頁沒有返回鍵**，
+ *      標題一藏，整條頂列就只剩語言切換，使用者看不到自己在哪個系統。
+ *    ② 把語言切換推到右邊的責任交給了 .backbtn，而首頁沒有 .backbtn，
+ *      於是沒有東西推它，語言切換掉到最左邊。
+ *
+ *    兩個 bug 同源：**版面靠「隔壁有某個元素」成立**。那個元素一旦不存在
+ *    或被隱藏，版面就散掉，而且不會有任何錯誤訊息。
+ *
+ * 現在的取捨順序：標題永遠顯示（放不下自己截斷）→ 空間不夠時
+ * 犧牲返回鍵的**文字**，箭頭留著。
+ */
 @media screen and (max-width: 420px) {
-  .topbar .brand { display: none; }
-  .backbtn { margin-right: auto; }
+  .topbar .brand { font-size: 15px; }
+
+  /* 只留箭頭，省下約 60px 給標題。實測 320px 上中文標題因此能完整顯示。
+     ⚠️ 它仍然是有邊框、48px 高的按鈕（見上方 .backbtn 的說明），
+        找得到也點得到——被拿掉的只有文字，不是按鈕本身。 */
+  .backbtn .word { display: none; }
+  .backbtn { padding: 0 12px; }
 }
 
-/* 語言切換：兩顆並排的小膠囊 */
-.lang { display: flex; gap: 4px; }
+/**
+ * 語言切換：兩顆並排的小膠囊。
+ *
+ * ⚠️ margin-left:auto 是它**自己**靠右，不依賴左邊有什麼元素。
+ *    先前是靠隔壁元素的 margin-right:auto 推——那個元素不存在時
+ *    （首頁沒有返回鍵）它就掉到左邊。自己靠右的寫法對任何頁面都成立。
+ */
+.lang { display: flex; gap: 4px; flex: 0 0 auto; margin-left: auto; }
 
+/* ⚠️ 高度用 --tap-min（48px），不是先前的 36px。
+      36px 沒有達到專案自己訂的標準——那個標準的理由是「工廠光線、
+      戴著手套也要點得到」，語言切換沒有理由例外。
+      v2.4 的版面自動檢查抓到這一項（5 個頁面每一頁都有）。 */
 .lang button {
-  min-height: 36px;
+  min-height: var(--tap-min);
   padding: 0 12px;
   border: 1px solid var(--border-input);
   background: transparent;
@@ -776,6 +883,12 @@ select {
     display: flex;
     gap: 10px;
     padding: 4px 14px;
+
+    /* ⚠️ 一格裡可能有「姓名 ＋ 中文名 ＋ 廠別標籤」三個東西。
+       不換行的話，姓名一長就會把最右邊的標籤推出畫面外看不到
+       （標籤自己是 white-space:nowrap，縮不了）。
+       讓它換行，寧可多佔一行也不要有東西消失。 */
+    flex-wrap: wrap;
   }
   .dtable td::before {
     content: attr(data-label);

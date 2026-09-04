@@ -1,0 +1,25 @@
+{
+  "name": "PCI Antar Jemput Bandara",
+  "short_name": "Antar Jemput",
+  "description": "Jadwal antar jemput bandara PCI",
+  "lang": "id",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EFEFED",
+  "theme_color": "#EFEFED",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180",
+      "purpose": "any"
+    }
+  ]
+}

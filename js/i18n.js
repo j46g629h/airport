@@ -19,8 +19,8 @@ const I18N = {
 
     'home.query.title': 'Cek Jadwal Saya',
     'home.query.desc':  'Masukkan email untuk melihat jadwal antar jemput Anda',
-    'home.list.title':  'Cari per Tanggal / NO Pesawat',
-    'home.list.desc':   'Lihat siapa saja yang berangkat pada hari atau penerbangan yang sama',
+    'home.admin.title': 'Area Admin',
+    'home.admin.desc':  'Tambah, ubah, hapus data antar jemput (perlu akun)',
 
     'query.title':     'Cek Jadwal',
     'query.tab.email': 'Email',
@@ -229,8 +229,8 @@ const I18N = {
 
     'home.query.title': '查詢我的行程',
     'home.query.desc':  '輸入電子郵件，查看自己的接送安排',
-    'home.list.title':  '依航班日期／航班號查詢',
-    'home.list.desc':   '看看同一天或同班機還有誰',
+    'home.admin.title': '管理者專區',
+    'home.admin.desc':  '新增、修改、刪除接送資料（需要帳號密碼）',
 
     'query.title':     '查詢接送',
     'query.tab.email': '電子郵件',
