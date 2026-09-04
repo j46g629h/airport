@@ -41,6 +41,11 @@ var ROUTES = {
   //    這一支若漏了登入檢查，等於把整份歷史紀錄開放給任何知道網址的人
   listBookings:        function (p) { return withAuth(p, function (s) { return listBookings(p, s); }); },
 
+  /* 寫入（v3.0）。⚠️ 兩支都是**一般管理者也能用**——使用者 2026-09-04 決定
+     兩種管理者都有實際刪列的權限，所以第三個參數不能給 true。 */
+  updateBooking:       function (p) { return withAuth(p, function (s) { return updateBooking(p, s); }); },
+  deleteBooking:       function (p) { return withAuth(p, function (s) { return deleteBooking(p, s); }); },
+
   // ── 只有 SUPER ──（第三個參數 true）
   manageAdmin: function (p) { return withAuth(p, function (s) { return manageAdmin(p, s); }, true); }
 };

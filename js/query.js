@@ -249,8 +249,20 @@ function bookingCard(it) {
   if (it.flight)       row(rows, t('f.flight'), it.flight + (it.etd_eta ? '　' + it.etd_eta : ''));
   else if (it.etd_eta) row(rows, t('f.etd'), it.etd_eta);
   if (it.dorm)         row(rows, t('f.dorm'), it.dorm);
-  if (it.dept)         row(rows, t('f.dept'), it.dept);
-  if (it.hp)           row(rows, t('f.hp'), it.hp);
+  /* ⚠️ 部門與手機**刻意不顯示**（v3.0，使用者要求）。
+   *
+   *    這一頁不需要登入，任何知道網址的人都查得到同班機所有人——
+   *    列出手機號碼等於把全體台幹的電話變成一份可以抄走的名單。
+   *    而使用者要的是「我的車幾點來、在哪裡上車」，這兩欄對他沒有用。
+   *
+   *    ⚠️ 管理端（admin-list.html）**仍然顯示**：那裡要帳號密碼才進得去，
+   *       而管理者需要手機號碼才打得到人。
+   *
+   *    ⚠️ 後端仍然回傳這兩個欄位（管理端同一支資料來源要用）。
+   *       所以這是「不畫出來」，不是「查不到」——真正要遮蔽的話得改後端。
+   *       目前的判斷是：這一頁本來就不遮蔽他人個資（使用者明確的決定，
+   *       因為「知道當天同班機有誰」是實際需求），拿掉這兩欄是把
+   *       最敏感的那一項收起來，不是改變整體策略。 */
   if (it.email)        row(rows, t('f.email'), it.email);
   if (it.bagasi)       row(rows, t('f.bagasi'), it.bagasi);
 

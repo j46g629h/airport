@@ -250,3 +250,98 @@ function readIndex_() {
     return o;
   }).filter(function (o) { return o.tanggal_iso; });
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+   單列增量更新（v3.0）
+
+   ⚠️ **為什麼需要這一段。** _INDEX 是每 5 分鐘整張重建一次的。
+      管理者在 app 上改完存檔，畫面上卻還是舊值——他的第一個反應
+      一定是「沒存進去」，然後再改一次、再改一次。
+
+      整張重建要 19～24 秒，等不了；所以改完只補那一列。
+
+   ⚠️ 這**不是**把 _INDEX 變成雙向同步（設計約定第 1 條）。
+      方向仍然只有一個：週分頁 → _INDEX。這裡只是把「重算」的範圍
+      從整張縮小到一列，重算的來源還是週分頁上那一列。
+      補失敗也不會壞——每 5 分鐘那次整張重建會把它修正回來。
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * 重讀某一筆在週分頁上的現值，寫回 _INDEX 的對應列。
+ * 找不到那一筆（剛被刪掉）就把 _INDEX 上那一列移除。
+ */
+function patchIndexRow_(bookingId) {
+  var id = str_(bookingId);
+  if (!id) return false;
+
+  try {
+    var hit = findBookingRow_(id);
+    if (!hit) return removeIndexRow_(id);
+
+    /* ⚠️ 一定要走 indexRowsOf_，不可以自己組一份。
+       攤平的規則（出廠時間解析、跨午夜、狀態代碼…）只有那一支知道，
+       複製一份出來的話兩邊遲早會走鐘，而走鐘的樣子是
+       「app 上顯示的跟 Sheet 上不一樣」，查起來非常痛苦。 */
+    var rows = indexRowsOf_(hit.sheet, []);
+    var fresh = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (str_(rows[i].booking_id) === id) { fresh = rows[i]; break; }
+    }
+    if (!fresh) return removeIndexRow_(id);
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.INDEX);
+    if (!sheet) return false;
+    var n = INDEX_COLUMNS.length;
+    var line = INDEX_COLUMNS.map(function (col) {
+      return fresh[col.code] == null ? '' : fresh[col.code];
+    });
+
+    var at = findIndexRowNum_(sheet, id);
+    if (at) {
+      sheet.getRange(at, 1, 1, n).setValues([line]);
+    } else {
+      // 新的一筆（或搬過分頁之後索引還沒有它）→ 接在最後面
+      var target = sheet.getLastRow() + 1;
+      if (sheet.getMaxRows() < target) sheet.insertRowsAfter(sheet.getMaxRows(), 1);
+      sheet.getRange(target, 1, 1, n).setValues([line]);
+    }
+    return true;
+
+  } catch (e) {
+    /* ⚠️ 補索引失敗**不可以讓寫入整個失敗**。資料已經寫進週分頁了，
+       這裡只是讓畫面早一點看到；丟例外的話管理者會看到「儲存失敗」，
+       然後再存一次——而第一次其實是成功的。 */
+    logError_('patchIndexRow_', '補索引失敗（不影響已寫入的資料）', id + '：' + e);
+    return false;
+  }
+}
+
+
+/** 把 _INDEX 上某一筆移除（那一列被刪掉了） */
+function removeIndexRow_(bookingId) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.INDEX);
+    if (!sheet) return false;
+    var at = findIndexRowNum_(sheet, bookingId);
+    if (!at) return false;
+    sheet.deleteRow(at);
+    return true;
+  } catch (e) {
+    logError_('removeIndexRow_', '移除索引列失敗（不影響已刪除的資料）', bookingId + '：' + e);
+    return false;
+  }
+}
+
+
+/** _INDEX 上 booking_id 等於這個值的列號；沒有就回 0 */
+function findIndexRowNum_(sheet, bookingId) {
+  if (sheet.getLastRow() < FIRST_DATA_ROW) return 0;
+  var col = colIndexOf_(INDEX_COLUMNS, 'booking_id');
+  var ids = sheet.getRange(FIRST_DATA_ROW, col, sheet.getLastRow() - 1, 1).getValues();
+  var id = str_(bookingId);
+  for (var i = 0; i < ids.length; i++) {
+    if (str_(ids[i][0]) === id) return FIRST_DATA_ROW + i;
+  }
+  return 0;
+}

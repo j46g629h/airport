@@ -1093,6 +1093,118 @@ select {
 }
 
 
+/* ===== 修改表單（v3.0）=====
+   蓋滿整個畫面的表單。
+
+   ⚠️ 為什麼蓋滿整頁而不是插在列表中間：手機上如果讓表單擠在兩筆資料之間，
+      管理者一邊捲動一邊填，很容易填到一半就滑走了，而且不知道自己在改哪一筆。
+
+   ⚠️ 用 position: fixed ＋ 自己捲（overflow-y: auto），不是靠 body 捲。
+      配合 body.noscroll——不鎖住背後的話，手指在表單邊緣一滑，
+      捲的是後面那張長長的列表，看起來像表單自己跳掉了。 */
+.sheetwrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;               /* 手機：從底部長出來，拇指構得到 */
+  justify-content: center;
+  background: rgba(0, 0, 0, .45);
+}
+
+.sheetbox {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  max-height: 92vh;
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--lift-2);
+}
+
+.sheethead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px var(--gap);
+  border-bottom: 1px solid var(--border);
+}
+.sheethead h2 {
+  flex: 1 1 auto;
+  min-width: 0;                        /* 防禦規則第 3 條：flex 子元素要縮得下去 */
+  margin: 0;
+  font-size: var(--fs-lg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iconbtn {
+  flex: 0 0 auto;
+  width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ⚠️ 這裡才是會捲的那一層，不是整個視窗 */
+.sheetbody {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--gap);
+}
+
+/* 兩欄並排。⚠️ min-width: 0 一定要有——沒有的話長 email 會把格子撐開，
+   兩欄變成一欄還橫向捲動（防禦規則第 3 條） */
+.field2 { display: flex; gap: 10px; }
+.field2 > .field { flex: 1 1 0; min-width: 0; }
+
+.formsec {
+  margin: 18px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.formhint {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.sheetfoot {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.sheetfoot .btn { flex: 1 1 0; min-width: 0; }
+
+/* 刪除是不可復原的動作，顏色要跟其他按鈕分得出來 */
+.btn--danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+/* 表單打開時鎖住背後的頁面 */
+.noscroll { overflow: hidden; }
+
+/* 桌機：置中的對話框，四角都圓 */
+@media screen and (min-width: 761px) {
+  .sheetwrap { align-items: center; }
+  .sheetbox { border-radius: var(--radius-lg); max-height: 88vh; }
+}
+
 /* ===== 逾期未處理（v2.9）=====
    日期已經過了，狀態卻還停在「待定」或「待改期」——代表有一件事被忘記了。
 
@@ -1186,7 +1298,7 @@ select {
     --gap: 10px; --pad-card: 12px; --sec-gap: 18px;
   }
   body { background: #fff; }
-  .topbar, .tabs, .btn, .foot, .idlebar { display: none; }
+  .topbar, .tabs, .btn, .foot, .idlebar, .sheetwrap { display: none; }
   .booking { break-inside: avoid; box-shadow: none; }
 
   /* 班表列表：印出來就是一張純表格。

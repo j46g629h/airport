@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', function () {
   setApiRetryNotice(function () { showMsg(t('err.retrying'), 'info'); });
 
   wireEvents();
+  wireEditForm();                     // v3.0 修改表單
 
   // 連 token 都沒有就不必發 API，直接回登入頁
   if (!getToken()) { location.href = 'admin.html'; return; }
@@ -478,6 +479,9 @@ function render() {
     box.querySelectorAll('button[data-detail]').forEach(function (btn) {
       btn.addEventListener('click', function () { toggleDetail(btn.dataset.detail); });
     });
+    box.querySelectorAll('button[data-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function () { openEdit(btn.dataset.edit); });
+    });
     const moreBtn = document.getElementById('moreBtn');
     if (moreBtn) {
       moreBtn.addEventListener('click', function () {
@@ -614,6 +618,9 @@ function rowHtml(it) {
     '<td data-label="" class="cell-act">' +
       '<button type="button" class="chip" data-detail="' + esc(id) + '">' +
       esc(open ? t('list.close') : t('list.detail')) + '</button>' +
+      // v3.0：修改。⚠️ 帶的是 booking_id 不是列號——Sheet 上插一列，列號就全錯了
+      '<button type="button" class="chip" data-edit="' + esc(id) + '">' +
+      esc(t('list.edit')) + '</button>' +
     '</td></tr>';
 
   return summary + detailRowHtml(it, id, open);
@@ -796,3 +803,242 @@ function esc(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+   修改表單（v3.0）
+
+   ⚠️ 送出的一律是**欄位代碼**（SCHEDULED、PICKUP），不是畫面上的文字。
+      後端只認代碼——送中文進去會被擋成 STATUS_INVALID。
+
+   ⚠️ 前端的驗證只是**體驗**，把關在後端（gas/Bookings.js 的白名單與必填）。
+      任何人都能繞過畫面直接打 API。
+   ══════════════════════════════════════════════════════════════ */
+
+/* 表單欄位 id ←→ 後端欄位代碼。**這一份就是能改哪些欄位的全部**，
+   要跟 gas/Bookings.js 的 BOOKING_EDITABLE 對得上。 */
+const EDIT_FIELDS = {
+  eTanggal: 'tanggal', eArah: 'arah', eStatus: 'status',
+  eFlight: 'flight', eEtd: 'etd_eta', eDariPci: 'dari_pci', eTitik: 'titik_jemput',
+  eBagasi: 'bagasi', eRemark: 'remark',
+  eKendaraan: 'kendaraan', eSopir: 'sopir', eHpSopir: 'hp_sopir',
+  eName: 'name', eNamaCina: 'nama_cina', eFactory: 'factory', eDept: 'dept',
+  eDorm: 'dorm', eHp: 'hp', eCustom: 'custom', eEmail: 'email',
+  eEmailKontak: 'email_kontak', ePovs: 'povs', eGroup: 'group_id'
+};
+
+let editingId = '';
+let editingBefore = null;      // 開啟時的原值，用來只送真的有改的欄位
+
+
+function wireEditForm() {
+  const wrap = document.getElementById('editWrap');
+  if (!wrap) return;
+
+  document.getElementById('editClose').addEventListener('click', closeEdit);
+  document.getElementById('eCancel').addEventListener('click', closeEdit);
+  document.getElementById('editForm').addEventListener('submit', onEditSubmit);
+  document.getElementById('eDelete').addEventListener('click', onEditDelete);
+
+  document.getElementById('ePersonToggle').addEventListener('click', function () {
+    const box = document.getElementById('ePersonBox');
+    box.hidden = !box.hidden;
+  });
+
+  /* ⚠️ 日期輸入框的顯示順序跟著裝置的地區設定走，HTML 和 CSS 都改不了
+     （印尼手機 18/09/2026、美式設定 09/18/2026）。所以下面自己畫一行
+     確認文字，那一行永遠是 dd/mm/yyyy。 */
+  document.getElementById('eTanggal').addEventListener('change', showEditDate);
+
+  /* 點灰色背景關掉。⚠️ 只認背景本身——不加這個判斷的話，
+     在表單裡面點一下也會冒泡到這裡，填到一半整個關掉。 */
+  wrap.addEventListener('click', function (e) { if (e.target === wrap) closeEdit(); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !wrap.hidden) closeEdit();
+  });
+}
+
+
+function showEditDate() {
+  const v = document.getElementById('eTanggal').value;      // 一定是 YYYY-MM-DD（HTML 規格）
+  const el = document.getElementById('ePickedDate');
+  if (!v) { el.textContent = ''; return; }
+  const p = v.split('-');
+  el.textContent = '→ ' + p[2] + '/' + p[1] + '/' + p[0];
+}
+
+
+function openEdit(id) {
+  const it = allItems.filter(function (x) { return (x.id || '') === id; })[0];
+  if (!it) return;
+
+  editingId = id;
+  editingBefore = {};
+  editMsg('', '');
+
+  // 候選清單用目前載進來的資料組（不必多打一趟 API）
+  fillDatalist('dlFlight', distinctOf('flight'));
+  fillDatalist('dlTitik', distinctOf('titik_jemput'));
+  fillDatalist('dlFactory', distinctOf('factory'));
+  fillDatalist('dlDept', distinctOf('dept'));
+
+  Object.keys(EDIT_FIELDS).forEach(function (elId) {
+    const code = EDIT_FIELDS[elId];
+    const el = document.getElementById(elId);
+    let v;
+    if (code === 'tanggal') {
+      v = it.tanggal_iso || '';                 // <input type="date"> 只吃 YYYY-MM-DD
+    } else if (code === 'status') {
+      /* ⚠️ 帶 Sheet 上實際存的狀態（status_raw），不是畫面上算出來的。
+         算出來的那個會把「時間過了的已排定」顯示成已完成——
+         照著存回去等於把 Sheet 上的值改掉了，而管理者根本沒動它。 */
+      v = it.status_raw || it.status || 'SCHEDULED';
+    } else {
+      v = it[code] == null ? '' : String(it[code]);
+    }
+    el.value = v;
+    editingBefore[code] = v;
+  });
+
+  showEditDate();
+  document.getElementById('ePersonBox').hidden = true;
+  document.getElementById('editWho').textContent =
+    (it.name || '') + (it.nama_cina ? '　' + it.nama_cina : '') +
+    '　' + (it.tanggal || '') + '　' + t('arah.' + (it.arah || 'PICKUP'));
+
+  document.getElementById('editWrap').hidden = false;
+  /* ⚠️ 背後的列表不要跟著捲動。手機上不鎖的話，手指在表單邊緣一滑，
+     捲的是後面那張長長的列表，看起來像表單自己跳掉了。 */
+  document.body.classList.add('noscroll');
+}
+
+
+function closeEdit() {
+  document.getElementById('editWrap').hidden = true;
+  document.body.classList.remove('noscroll');
+  editingId = '';
+  editingBefore = null;
+}
+
+
+function fillDatalist(id, values) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = values.map(function (v) {
+    return '<option value="' + esc(v) + '"></option>';
+  }).join('');
+}
+
+
+/** 只收集**真的有改**的欄位。全部送的話，等於把畫面上看到的值原封蓋回去——
+ *  中間如果別人改過同一筆，他的修改會被無聲地蓋掉。 */
+function collectEditChanges() {
+  const out = {};
+  Object.keys(EDIT_FIELDS).forEach(function (elId) {
+    const code = EDIT_FIELDS[elId];
+    const now = document.getElementById(elId).value.trim();
+    if (now !== (editingBefore[code] || '')) out[code] = now;
+  });
+  return out;
+}
+
+
+async function onEditSubmit(e) {
+  e.preventDefault();
+  const fields = collectEditChanges();
+  if (!Object.keys(fields).length) { closeEdit(); return; }
+
+  const btn = document.getElementById('eSave');
+  btn.disabled = true;
+  btn.textContent = t('adm.working');
+  editMsg(t('adm.working'), 'info');
+  try {
+    /* ⚠️ 一律不重試。重試會把同一筆改兩次——改本身是冪等的，
+       但「搬分頁」不是：第一次搬完舊列就沒了，第二次會找不到而報錯，
+       管理者看到的是「失敗」，實際上第一次成功了。 */
+    const res = await apiAuth('updateBooking',
+      { booking_id: editingId, fields: JSON.stringify(fields) }, false);
+    if (!res || !res.ok) { editMsg(tBookingError(res), 'error'); return; }
+
+    applyUpdatedItem(res.data.item);
+    closeEdit();
+    showMsg(res.data.moved ? t('edit.savedMoved', { s: res.data.moved }) : t('edit.saved'), 'ok');
+  } catch (err) {
+    editMsg(connErr(err), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('edit.save');
+  }
+}
+
+
+async function onEditDelete() {
+  const it = allItems.filter(function (x) { return (x.id || '') === editingId; })[0];
+  if (!it) return;
+
+  /* ⚠️ 確認文字裡一定要寫出**姓名與日期**。只寫「確定要刪除嗎」的話，
+     管理者按下去的當下並不知道自己刪的是哪一筆——而這個動作無法復原。
+     （使用者 2026-09-05 決定不做整列備份；誤刪要靠 Sheet 的「檔案 → 版本紀錄」救。） */
+  const who = (it.name || '') + '　' + (it.tanggal || '') + '　' + t('arah.' + (it.arah || 'PICKUP'));
+  if (!confirm(t('edit.confirmDelete', { s: who }))) return;
+
+  const btn = document.getElementById('eDelete');
+  btn.disabled = true;
+  try {
+    const res = await apiAuth('deleteBooking', { booking_id: editingId }, false);
+    if (!res || !res.ok) { editMsg(tBookingError(res), 'error'); return; }
+
+    const gone = editingId;
+    closeEdit();
+    allItems = allItems.filter(function (x) { return (x.id || '') !== gone; });
+    applyFilters();
+    showMsg(t('edit.deleted'), 'ok');
+  } catch (err) {
+    editMsg(connErr(err), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('edit.delete');
+  }
+}
+
+
+/**
+ * 把後端回來的那一筆換掉畫面上的舊值。
+ *
+ * ⚠️ 用後端回傳的，不是用表單裡打的。兩者會不一樣——出廠時間會被重新解析、
+ *    狀態會依時間算成已完成、搬過分頁的話位置也變了。
+ *    照表單顯示的話，畫面跟 Sheet 上就對不起來了。
+ */
+function applyUpdatedItem(item) {
+  if (!item) { loadData(); return; }        // 後端沒回（索引還沒補上）→ 整批重讀
+  for (let i = 0; i < allItems.length; i++) {
+    if ((allItems[i].id || '') === (item.id || '')) { allItems[i] = item; break; }
+  }
+  applyFilters();
+}
+
+
+function editMsg(text, kind) {
+  const el = document.getElementById('editMsg');
+  el.textContent = text || '';
+  el.className = text ? ('msg msg--' + (kind || 'info')) : '';
+  el.hidden = !text;
+}
+
+
+function tBookingError(res) {
+  const code = res && res.error;
+  switch (code) {
+    case 'BOOKING_NOT_FOUND':    return t('edit.err.gone');
+    case 'BOOKING_ID_REQUIRED':  return t('edit.err.gone');
+    case 'FIELD_REQUIRED':       return t('edit.err.required');
+    case 'DATE_INVALID':         return t('edit.err.date');
+    case 'STATUS_INVALID':       return t('edit.err.status');
+    case 'ARAH_INVALID':         return t('edit.err.status');
+    case 'FIELDS_INVALID':       return t('err.server');
+    case 'BUSY':                 return t('edit.err.busy');
+    default:                     return tAdminError(res);
+  }
+}
+

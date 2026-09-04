@@ -6,15 +6,15 @@
 <meta name="theme-color" content="#EFEFED">
 <meta name="robots" content="noindex, nofollow">
 <!-- 圖示與主畫面設定的完整說明在 index.html 的 <head> -->
-<link rel="icon" href="favicon.svg?v=2.9.2" type="image/svg+xml">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.9.2">
-<link rel="manifest" href="manifest.json?v=2.9.2">
+<link rel="icon" href="favicon.svg?v=3.0" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3.0">
+<link rel="manifest" href="manifest.json?v=3.0">
 <!-- CSS 還沒下載完之前先鋪底色，避免工廠 wifi 慢時先白閃一下 -->
 <style>html{background:#EFEFED}</style>
 <title>Daftar Jadwal — PCI Antar Jemput Bandara</title>
 <!-- ⚠️ 改了 CSS 或 JS 一定要把所有 HTML 的 ?v= 一起往上加，
      js/config.js 與 gas/Config.js 的 version 也要同步（tools/check.js 會比對） -->
-<link rel="stylesheet" href="css/style.css?v=2.9.2">
+<link rel="stylesheet" href="css/style.css?v=3.0">
 </head>
 <body>
 
@@ -182,11 +182,189 @@
 
 </main>
 
-<script src="js/config.js?v=2.9.2"></script>
-<script src="js/i18n.js?v=2.9.2"></script>
-<script src="js/api.js?v=2.9.2"></script>
-<script src="js/admin-session.js?v=2.9.2"></script>
-<script src="js/admin-list.js?v=2.9.2"></script>
+  <!--
+    修改表單（v3.0）。
+
+    ⚠️ 蓋在整個畫面上（不是插在列表中間）：手機上如果讓表單擠在兩筆資料之間，
+       管理者一邊捲動一邊填，很容易填到一半就滑走了。蓋滿整頁就沒有這個問題。
+
+    ⚠️ 送出的是**欄位代碼**（SCHEDULED、PICKUP），不是畫面上的文字。
+       後端只認代碼，也只寫得進白名單裡的欄位（gas/Bookings.js 的 BOOKING_EDITABLE）。
+  -->
+  <div class="sheetwrap" id="editWrap" hidden>
+    <div class="sheetbox" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+
+      <div class="sheethead">
+        <h2 id="editTitle" data-i18n="edit.title">Ubah data</h2>
+        <button type="button" class="iconbtn" id="editClose" aria-label="Close">✕</button>
+      </div>
+
+      <form id="editForm" class="sheetbody">
+        <p class="subtle" id="editWho"></p>
+        <div class="msg" id="editMsg" hidden></div>
+
+        <!-- ── 常改的 ── -->
+        <div class="field">
+          <label for="eTanggal" data-i18n="edit.date">Tanggal pesawat</label>
+          <input type="date" id="eTanggal" required>
+          <div class="picked" id="ePickedDate" aria-live="polite"></div>
+        </div>
+
+        <div class="field2">
+          <div class="field">
+            <label for="eArah" data-i18n="edit.arah">Jemput / Antar</label>
+            <select id="eArah" required>
+              <option value="PICKUP"  data-i18n="arah.PICKUP"></option>
+              <option value="DROPOFF" data-i18n="arah.DROPOFF"></option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="eStatus" data-i18n="list.status">Status</label>
+            <select id="eStatus" required>
+              <option value="SCHEDULED"  data-i18n="status.SCHEDULED"></option>
+              <option value="DONE"       data-i18n="status.DONE"></option>
+              <option value="INCOMPLETE" data-i18n="status.INCOMPLETE"></option>
+              <option value="PENDING"    data-i18n="status.PENDING"></option>
+              <option value="CANCELLED"  data-i18n="status.CANCELLED"></option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field2">
+          <div class="field">
+            <label for="eFlight" data-i18n="f.flight">NO Pesawat</label>
+            <input type="text" id="eFlight" list="dlFlight" autocapitalize="characters" spellcheck="false">
+            <datalist id="dlFlight"></datalist>
+          </div>
+          <div class="field">
+            <label for="eEtd" data-i18n="f.etd">Jam pesawat</label>
+            <input type="text" id="eEtd" inputmode="numeric" placeholder="14:20">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="eDariPci" data-i18n="f.pickup">Jam dari PCI</label>
+          <input type="text" id="eDariPci" placeholder="20:00">
+          <!-- ⚠️ 這一欄是純文字，兩種寫法（設計約定第 3 條）。說明一定要留著，
+               不然管理者會打成 09/03 20:00 而被讀成 3 月 9 日 -->
+          <span class="hint" data-i18n="edit.pciHint"></span>
+        </div>
+
+        <div class="field">
+          <label for="eTitik" data-i18n="f.titik">Titik jemput</label>
+          <input type="text" id="eTitik" list="dlTitik">
+          <datalist id="dlTitik"></datalist>
+        </div>
+
+        <div class="field2">
+          <div class="field">
+            <label for="eBagasi" data-i18n="f.bagasi">Bagasi</label>
+            <input type="text" id="eBagasi">
+          </div>
+          <div class="field">
+            <label for="eRemark" data-i18n="f.remark">Catatan</label>
+            <input type="text" id="eRemark">
+          </div>
+        </div>
+
+        <!-- ── 派車（v3.0 新增，欄位 Z/AA/AB 早就備好了）── -->
+        <h3 class="formsec" data-i18n="edit.sec.vehicle">Kendaraan</h3>
+        <div class="field">
+          <label for="eKendaraan" data-i18n="f.kendaraan">No. kendaraan</label>
+          <input type="text" id="eKendaraan" autocapitalize="characters">
+        </div>
+        <div class="field2">
+          <div class="field">
+            <label for="eSopir" data-i18n="f.sopir">Sopir</label>
+            <input type="text" id="eSopir">
+          </div>
+          <div class="field">
+            <label for="eHpSopir" data-i18n="f.hpSopir">HP sopir</label>
+            <input type="text" id="eHpSopir" inputmode="tel">
+          </div>
+        </div>
+
+        <!-- ── 人員資料（收起來）── -->
+        <button type="button" class="chip" id="ePersonToggle" data-i18n="edit.sec.person">Data orang</button>
+        <div id="ePersonBox" hidden>
+          <!-- ⚠️ 這一區是「名冊快照」（設計約定第 4 條）：新增當下就複製進來，
+               之後名冊怎麼改都不會動到歷史紀錄。平常不該改，打錯字才改。 -->
+          <p class="formhint" data-i18n="edit.personHint"></p>
+          <div class="field">
+            <label for="eName" data-i18n="edit.name">Nama</label>
+            <input type="text" id="eName" required>
+          </div>
+          <div class="field2">
+            <div class="field">
+              <label for="eNamaCina" data-i18n="edit.namaCina">Nama Cina</label>
+              <input type="text" id="eNamaCina">
+            </div>
+            <div class="field">
+              <label for="eFactory" data-i18n="f.factory">Factory</label>
+              <input type="text" id="eFactory" list="dlFactory">
+              <datalist id="dlFactory"></datalist>
+            </div>
+          </div>
+          <div class="field2">
+            <div class="field">
+              <label for="eDept" data-i18n="f.dept">Dept</label>
+              <input type="text" id="eDept" list="dlDept">
+              <datalist id="dlDept"></datalist>
+            </div>
+            <div class="field">
+              <label for="eDorm" data-i18n="f.dorm">Kamar</label>
+              <input type="text" id="eDorm">
+            </div>
+          </div>
+          <div class="field2">
+            <div class="field">
+              <label for="eHp" data-i18n="f.hp">HP</label>
+              <input type="text" id="eHp" inputmode="tel">
+            </div>
+            <div class="field">
+              <label for="eCustom" data-i18n="f.custom">Custom</label>
+              <select id="eCustom">
+                <option value=""></option>
+                <option value="YES">YES</option>
+                <option value="NO">NO</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="eEmail" data-i18n="f.email">Email</label>
+            <input type="text" id="eEmail" inputmode="email" autocapitalize="off">
+          </div>
+          <div class="field">
+            <label for="eEmailKontak" data-i18n="f.emailKontak">Email kontak</label>
+            <input type="text" id="eEmailKontak" inputmode="email" autocapitalize="off">
+          </div>
+          <div class="field2">
+            <div class="field">
+              <label for="ePovs" data-i18n="f.povs">POVS</label>
+              <input type="text" id="ePovs">
+            </div>
+            <div class="field">
+              <label for="eGroup" data-i18n="f.group">Grup</label>
+              <input type="text" id="eGroup">
+            </div>
+          </div>
+        </div>
+
+        <div class="sheetfoot">
+          <button type="submit" class="btn" id="eSave" data-i18n="edit.save">Simpan</button>
+          <button type="button" class="btn btn--quiet" id="eCancel" data-i18n="edit.cancel">Batal</button>
+          <button type="button" class="btn btn--danger" id="eDelete" data-i18n="edit.delete">Hapus</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+<script src="js/config.js?v=3.0"></script>
+<script src="js/i18n.js?v=3.0"></script>
+<script src="js/api.js?v=3.0"></script>
+<script src="js/admin-session.js?v=3.0"></script>
+<script src="js/admin-list.js?v=3.0"></script>
 
 </body>
 </html>

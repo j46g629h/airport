@@ -182,6 +182,60 @@ function checkVersions() {
 }
 
 
+/* ── 4b. HTML 是不是完整的 ──────────────────────────────── */
+
+/**
+ * 每個 HTML 檔案該有的收尾都在不在。
+ *
+ * ⚠️ 這一條是實際踩過才加的（v3.0）：一次用程式插入區塊的編輯把
+ *    `</main>` 之後的東西**整段砍掉了**——頁尾、所有 <script> 標籤、
+ *    `</body></html>` 全部不見。
+ *
+ *    可怕的地方在於**當時所有檢查都是綠的**：語法檢查只看 .js，
+ *    版本號檢查只數 ?v= 的字串（剩下的那幾個剛好還在），
+ *    翻譯檢查只掃 data-i18n。而瀏覽器對半截的 HTML 完全不抱怨，
+ *    它只是安靜地不載入任何 JavaScript——畫面長得幾乎一樣，
+ *    按什麼都沒反應。
+ *
+ * 所以這裡不看內容，只問三件事：結尾在不在、載不載得到 JS、標籤有沒有配對。
+ */
+function checkHtmlComplete() {
+  const files = fs.readdirSync(ROOT).filter(f => f.endsWith('.html'));
+  let bad = 0;
+
+  files.forEach(f => {
+    const src = read(f);
+
+    if (!/<\/html>\s*$/.test(src)) {
+      fail(f + ' 沒有以 </html> 結尾——檔案可能被截斷了');
+      bad++;
+      return;
+    }
+    if (!/<\/body>/.test(src)) { fail(f + ' 找不到 </body>'); bad++; return; }
+
+    // 每一頁都至少要載入 config.js 與 i18n.js，不然整頁的 JS 都不會動
+    const scripts = (src.match(/<script\s[^>]*src=/g) || []).length;
+    if (scripts < 2) {
+      fail(f + ' 只有 ' + scripts + ' 個 <script src=>，正常至少 2 個' +
+           '（config.js ＋ i18n.js）。檔案可能被截斷了');
+      bad++;
+      return;
+    }
+
+    // 開合標籤數量對不上 → 通常就是被截斷或多貼了一段
+    [['main', /<main[\s>]/g, /<\/main>/g],
+     ['body', /<body[\s>]/g, /<\/body>/g],
+     ['form', /<form[\s>]/g, /<\/form>/g]].forEach(pair => {
+      const o = (src.match(pair[1]) || []).length;
+      const c = (src.match(pair[2]) || []).length;
+      if (o !== c) { fail(f + ' 的 <' + pair[0] + '> 開合數量對不上：' + o + ' 開、' + c + ' 合'); bad++; }
+    });
+  });
+
+  if (!bad) ok('HTML 結構完整：' + files.length + ' 個檔案都有收尾與 <script>');
+}
+
+
 /* ── 5. 翻譯有沒有漏 ────────────────────────────────────── */
 
 /**
@@ -224,7 +278,23 @@ function checkI18n() {
   if (missing.size) fail('HTML 用到不存在的翻譯 key：\n      ' + [...missing].join('\n      '));
 
   if (!onlyId.length && !onlyZh.length && !missing.size) {
-    ok('翻譯完整：兩種語言各 ' + idKeys.length + ' 句，HTML 用到的 key 都存在');
+    /* ⚠️ 翻譯字串是**純文字**，畫面上用 textContent 塞進去，不是 markdown。
+       寫了 **粗體** 的話，星號會原樣印在使用者眼前。
+       實際踩過兩次（v2.5 的帳號頁、v3.0 的修改表單）——程式碼註解裡
+       這樣寫是習慣，順手就帶進字串裡了，而且畫面看起來「只是多了幾個星號」，
+       不像壞掉，所以會一直留著。 */
+    const md = [];
+    [['id', I18N.id], ['zh', I18N.zh]].forEach(pair => {
+      Object.keys(pair[1]).forEach(k => {
+        if (/\*\*/.test(String(pair[1][k]))) md.push(pair[0] + ' / ' + k);
+      });
+    });
+    if (md.length) {
+      fail('翻譯字串裡有 markdown 的 **粗體**（畫面上會直接印出星號）：\n      ' +
+           md.join('\n      '));
+    } else {
+      ok('翻譯完整：兩種語言各 ' + idKeys.length + ' 句，HTML 用到的 key 都存在');
+    }
   }
 }
 
@@ -254,6 +324,7 @@ function main() {
   checkDuplicateFunctions();
   checkControlChars();
   const version = checkVersions();
+  checkHtmlComplete();
   checkI18n();
   checkGitignore();
 
