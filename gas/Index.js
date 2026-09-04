@@ -324,7 +324,11 @@ function removeIndexRow_(bookingId) {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.INDEX);
     if (!sheet) return false;
     var at = findIndexRowNum_(sheet, bookingId);
-    if (!at) return false;
+    /* ⚠️ 索引上本來就沒有這一筆 → 回傳 **true**（成功），不是 false。
+       回傳值的意思是「索引現在跟週分頁一致嗎」，不是「有沒有刪到東西」。
+       這裡回 false 的話，呼叫端會誤以為要整張重建——而整張重建要 19~24 秒，
+       那正是 v3.0 讓每次編輯都拖慢系統的原因。 */
+    if (!at) return true;
     sheet.deleteRow(at);
     return true;
   } catch (e) {

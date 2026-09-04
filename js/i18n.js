@@ -246,9 +246,7 @@ const I18N = {
     'list.detail':      'Detail',
     'list.close':       'Tutup',
 
-    'th.date':   'Tanggal',
-    'th.arah':   'Jemput/Antar',
-    'th.name':   'Nama',
+    'th.dateName': 'Tanggal / Nama',
     'th.flight': 'NO Pesawat',
     'th.pickup': 'Dari PCI',
     'th.titik':  'Titik jemput',
@@ -499,9 +497,7 @@ const I18N = {
     'list.detail':      '詳細',
     'list.close':       '收合',
 
-    'th.date':   '日期',
-    'th.arah':   '接／送',
-    'th.name':   '姓名',
+    'th.dateName': '日期／姓名',
     'th.flight': '航班',
     'th.pickup': '出廠時間',
     'th.titik':  '上車地點',

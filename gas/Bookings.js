@@ -284,8 +284,19 @@ function updateBooking(params, session) {
       writeBookingPatch_(hit.sheet, hit.rowNum, hit.map, patch, newDate, session);
     }
 
-    markIndexDirty_();
-    patchIndexRow_(id);                 // 讓管理者存完檔立刻看得到
+    /* ⚠️ **只有補列失敗時才標記整張重建。**
+       v3.0 這裡是無條件 markIndexDirty_() ＋ patchIndexRow_() 兩件都做，
+       那是錯的——補完那一列之後索引已經是對的，不需要整張重建。
+
+       後果很具體：每改一筆，5 分鐘後的排程就會做一次 19~24 秒的整張重建，
+       而重建會佔住 script lock 20 秒，那段時間管理者按儲存會等很久甚至拿到 BUSY。
+       更糟的是排程配額——Index.js 檔頭算過「每 5 分鐘重建 = 一天 93 分鐘，
+       而配額是 90 分鐘／天」。配額用完時 Google 會直接停掉排程，
+       **而且不會有任何錯誤訊息**，只會發現「下午的資料都沒更新」。
+
+       索引仍有兩道保險：超過 INDEX_MAX_AGE_HOURS（6 小時）強制重建、
+       每天 03:00 整張重建。所以少標記一次不會讓索引永遠是舊的。 */
+    if (!patchIndexRow_(id)) markIndexDirty_();
 
     logInfo_('updateBooking', '修改 ' + id,
              session.account + '　' + Object.keys(patch).join(',') + (moved ? '　' + moved : ''));
@@ -375,8 +386,8 @@ function deleteBooking(params, session) {
 
     hit.sheet.deleteRow(hit.rowNum);
 
-    markIndexDirty_();
-    removeIndexRow_(id);
+    // 同上：移除成功就不必整張重建（見 updateBooking 裡的說明）
+    if (!removeIndexRow_(id)) markIndexDirty_();
 
     logInfo_('deleteBooking', '刪除 ' + id,
              session.account + '　' + who + '　' +

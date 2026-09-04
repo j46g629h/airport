@@ -472,8 +472,11 @@ function render() {
 
     box.innerHTML =
       '<div class="tablewrap"><table class="dtable"><thead><tr>' +
-        th('th.date') + th('th.arah') + th('th.name') + th('th.flight') +
-        th('th.pickup') + th('th.titik') + th('th.status') + th('th.detail') +
+        /* v3.1：8 欄 → 6 欄。日期與姓名併一格、狀態與接／送併一格。
+           省下來的寬度讓「出廠時間」與「上車地點」不再折行——
+           那才是先前「留白很多、每一列卻很高」的真正原因。 */
+        th('th.dateName') + th('th.flight') + th('th.pickup') +
+        th('th.titik') + th('th.status') + th('th.detail') +
       '</tr></thead><tbody>' + rows + '</tbody></table></div>' + more;
 
     box.querySelectorAll('button[data-detail]').forEach(function (btn) {
@@ -605,16 +608,27 @@ function rowHtml(it) {
   }
 
   const open = !!openDetails[id];
+  /* 日期＋姓名同一格（v3.1）。桌機上並排、手機上放不下就自己折到第二行。
+     ⚠️ 這是同一份 markup 在兩種版面下用，不是兩套——
+        分成兩套的話，改了一邊忘了另一邊是遲早的事。 */
+  const dateName =
+    '<div class="cellmain">' +
+      '<span class="rdate">' + esc(it.tanggal || '') + '</span>' +
+      '<span class="rname">' + name + '</span>' +
+      (it.tanggal_asal
+        ? '<span class="subtle">' + esc(t('f.asal')) + ' ' + esc(it.tanggal_asal) + '</span>' : '') +
+    '</div>';
+
+  // 狀態＋接／送同一格，上下疊（v3.1）
+  const statusCell = '<div class="cellstat">' + statusTag + arahTag + '</div>';
+
   const summary =
     '<tr class="' + cls.join(' ') + '">' +
-    td('th.date', esc(it.tanggal || '') +
-       (it.tanggal_asal ? '<span class="subtle">' + esc(t('f.asal')) + ' ' + esc(it.tanggal_asal) + '</span>' : '')) +
-    td('th.arah', arahTag) +
-    td('th.name', name) +
+    td('th.dateName', dateName) +
     td('th.flight', flight) +
     td('th.pickup', esc(pickup)) +
     td('th.titik', esc(it.titik_jemput || '')) +
-    td('th.status', statusTag) +
+    td('th.status', statusCell) +
     '<td data-label="" class="cell-act">' +
       '<button type="button" class="chip" data-detail="' + esc(id) + '">' +
       esc(open ? t('list.close') : t('list.detail')) + '</button>' +
