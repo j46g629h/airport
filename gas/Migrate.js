@@ -54,10 +54,19 @@ function migrateStatusLabels_(dryRun) {
     var blocked = [];       // 想改但條件不足，刻意不動的
     var scanned = 0;
     var touchedSheets = 0;
+    var weekSheets = [];    // 掃過的週分頁，第三階段要重裝下拉選單
 
     ss.getSheets().forEach(function (sheet) {
       if (!isWeekSheet_(sheet)) return;
       var last = sheet.getLastRow();
+
+      /* ⚠️ 這一行要放在所有 return **之前**。
+         還沒有資料的空白週分頁（未來三週那幾張）也要換下拉選單——
+         那正是管理者接下來要輸入新資料的地方。
+         放在下面的話它們會被 `last < FIRST_DATA_ROW` 那一行跳過，
+         而且完全看不出來：有資料的分頁都對了，只有空的那幾張選不到新選項。 */
+      weekSheets.push({ sheet: sheet, last: last });
+
       if (last < FIRST_DATA_ROW) return;
 
       /* ⚠️ 欄位位置一律問表頭，不可以用 MAIN_COLUMNS 的定義順序
@@ -110,16 +119,37 @@ function migrateStatusLabels_(dryRun) {
         /* ⚠️ 一定要先清掉資料驗證才寫得進去。新的下拉清單裡沒有舊的值，
            而嚴格驗證（setAllowInvalid(false)）會直接擋下寫入——
            而且它擋下來的樣子是丟例外，不是安靜失敗，整支會中斷在一半。
-           寫完由 applyStructure_ 把新的清單裝回去。 */
+           清掉的驗證由下面的第三階段一次裝回去。 */
         var range = sheet.getRange(FIRST_DATA_ROW, statusCol, last - 1, 1);
         range.clearDataValidations();
         updates.forEach(function (u) {
           sheet.getRange(u[0], statusCol).setValue(u[1]);
         });
-        applyStructure_(sheet, MAIN_COLUMNS, Math.max(PREP_ROWS_WEEK, last));
         touchedSheets++;
       }
     });
+
+    /* ══ 第三階段：把下拉選單換成新的 ══════════════════════════════
+       ⚠️ **不論有沒有改到任何一筆資料都要做。** 這是實際踩過的坑：
+
+       原本這一行掛在「有 updates 才執行」裡面。而實際上線時搬遷是 0 筆
+       （匯進來的資料本來就沒有舊的「待定」與「已改期」），
+       於是下拉選單**一次都沒有被換掉**——Sheet 上還是舊的五個選項，
+       而 STATUS 那一欄是嚴格驗證（setAllowInvalid(false)），
+       結果就是管理者**選不到也打不進新的「待定」與「待改期」**。
+
+       而且它不會報錯，只會在你想選的時候發現「選單裡沒有那一項」，
+       完全看不出是搬遷少做了一步。
+
+       教訓：**改了 LIST_STATUS 就一定要重裝下拉選單**，
+       這件事跟「有沒有資料要搬」是兩回事。 */
+    var refreshed = 0;
+    if (!dryRun) {
+      weekSheets.forEach(function (w) {
+        applyStructure_(w.sheet, MAIN_COLUMNS, Math.max(PREP_ROWS_WEEK, w.last));
+        refreshed++;
+      });
+    }
 
     var L = [];
     L.push((dryRun ? '【試跑，一個字都沒寫】' : '【已執行】') +
@@ -142,6 +172,14 @@ function migrateStatusLabels_(dryRun) {
     if (!changed.length && !blocked.length) {
       L.push('');
       L.push('沒有需要搬遷的資料——狀態標籤已經是新的了。');
+    }
+
+    L.push('');
+    if (dryRun) {
+      L.push('執行時還會把 ' + weekSheets.length + ' 個週分頁的下拉選單換成新的五個選項' +
+             '（這件事跟有沒有資料要搬無關，一定會做）。');
+    } else {
+      L.push('✓ 已重裝 ' + refreshed + ' 個週分頁的下拉選單（新的五個狀態選項）');
     }
 
     if (!dryRun && changed.length) {

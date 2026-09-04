@@ -35,6 +35,7 @@ function onOpen(e) {
          把「執行」放在「試跑」前面的話，總有一天有人會直接按到下面那個。 */
       .addItem('① 試跑：狀態標籤搬遷（不會寫入）', 'menuPreviewMigrateStatus')
       .addItem('② 執行：狀態標籤搬遷', 'menuMigrateStatus')
+      .addItem('重設下拉選單（改過選項之後跑）', 'menuRefreshDropdowns')
       .addToUi();
   } catch (err) {
     Logger.log('建立選單失敗：' + err.message);
@@ -148,6 +149,26 @@ function menuTidyPersonColumns() {
  *    第一次跑完，那些 W 欄（原訂日期）空白的「已改期」不會被動到；
  *    補完 W 欄再跑一次，它們就會轉成「已排定」。
  */
+/**
+ * 重裝所有週分頁的下拉選單。
+ *
+ * ⚠️ **改過 Config.js 裡任何一個 LIST_xxx 就要跑這一支。**
+ *    Sheet 上的下拉選單是「裝上去的」，不是每次讀 Config 現算的——
+ *    程式改了、Sheet 上那份沒換，兩邊就對不起來。
+ *
+ * ⚠️ 而且狀態、接／送這些是**嚴格驗證**（setAllowInvalid(false)）：
+ *    選單裡沒有的值，管理者選不到、也打不進去。
+ *    v2.9 上線時就這樣漏過一次——搬遷是 0 筆，而重裝選單原本掛在
+ *    「有資料要搬才做」裡面，於是一次都沒跑到，新的兩個狀態
+ *    在 Sheet 上完全用不了，而且不會有任何錯誤訊息。
+ *
+ * 重複執行是安全的（就是重裝一次）。
+ */
+function menuRefreshDropdowns() {
+  showReport_('重設下拉選單', refreshDropdowns());
+}
+
+
 function menuPreviewMigrateStatus() {
   showReport_('試跑：狀態標籤搬遷', previewMigrateStatus());
 }
