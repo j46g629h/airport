@@ -58,8 +58,32 @@ function listBookings(params, session) {
 
   var matched = [];
   var index = readIndex_();
+
+  /* ── 逾期未處理：**全部期間**的筆數（v3.3）────────────────────────
+   *
+   * ⚠️ 這個數字刻意**不跟著查詢範圍走**，跟畫面上其他統計都不一樣。
+   *
+   *    為什麼：預設範圍是「未來 14 天」，而逾期的一定在**過去**——
+   *    只算範圍內的話，管理者在預設檢視下**永遠看到 0**。
+   *    v2.9 做的逾期提醒就是這樣，等於做了卻沒有作用。
+   *    三個月前沒敲定的行程，今天一樣要處理，被範圍藏起來就永遠沒人發現。
+   *
+   * ⚠️ 在這裡算是**免費的**——listBookings 本來就讀了整張 _INDEX。
+   *    另外開一支 API 會多一趟 3~8 秒的往返，換到的是同一個數字。
+   */
+  var todayIso = isoDate_(today_());
+  var overdue = 0;
+
   for (var i = 0; i < index.length; i++) {
     var r = index[i];
+
+    // 逾期：日期已經過了，狀態卻還停在「待定」或「待改期」。
+    // ⚠️ 這一段在範圍過濾**之前**，才會是全部期間的數字。
+    if (r.tanggal_iso && r.tanggal_iso < todayIso &&
+        (r.status_code === 'PENDING' || r.status_code === 'INCOMPLETE')) {
+      overdue++;
+    }
+
     if (fromIso && r.tanggal_iso < fromIso) continue;
     if (toIso   && r.tanggal_iso > toIso)   continue;
     matched.push(r);
@@ -91,7 +115,9 @@ function listBookings(params, session) {
     // 資料新鮮度。⚠️ _INDEX 每 5 分鐘才重建一次，管理者剛在 Sheet 上改完
     //    可能還沒進來——不講清楚的話他會以為是 app 壞了（見 Index.js 說明）
     index_built_at: indexBuiltAtText_(),
-    now:            nowStampText_()
+    now:            nowStampText_(),
+    // ⚠️ 全部期間的逾期筆數，不受 from/to 影響（見上方說明）
+    overdue_all:    overdue
   });
 }
 
