@@ -41,6 +41,16 @@ let openDetails = {};        // 哪幾筆的「詳細」是展開的（重畫後
  */
 let pendingSelects = null;
 
+/* 目前的檢視範圍代號（week / next14 / month / past14 / all / custom）。
+   ⚠️ 只是**畫面上的標籤**，真正去查的還是 #fFrom / #fTo 的值——
+      這兩者一定要一起改，不然標籤寫「本週」而查的是別的區間。 */
+let rangeKind = 'next14';
+
+/* 統計卡選了哪一張（'' / TODO / SCHEDULED / DONE）。
+   ⚠️ 它跟下面「其他篩選」裡的狀態按鈕是**同一個東西的兩個入口**，
+      所以按卡片時要把那些按鈕也同步過去，不然兩邊會顯示不一致。 */
+let statPick = '';
+
 
 /* ══════════════════ 初始化 ══════════════════ */
 
@@ -62,8 +72,14 @@ document.addEventListener('DOMContentLoaded', function () {
   syncPickedDates();
 
   /* ⚠️ 畫面立刻顯示，不要等驗證回來（那是 3~8 秒的空白）。
-     使用者這段時間就看得到篩選條件、可以先調，資料區顯示骨架。 */
+     使用者這段時間就看得到篩選條件、可以先調，資料區顯示骨架。
+
+     ⚠️ 所以這一頁**不放整頁的轉圈圈**。v3.3 一度加了一個 #bootView，
+        但它在 DOMContentLoaded 當下就被關掉，等於永遠不會出現——
+        等待的那幾秒是由 showSkeleton() 在資料區畫骨架來交代的。 */
   document.getElementById('content').hidden = false;
+  document.getElementById('adminBar').hidden = false;
+  renderPeriodBar();
 
   /* ⚠️ 先用 sessionStorage 裡既有的 profile 畫導覽列——那是登入時存的，
      所以進到這一頁的當下就有，不必等 API。requireLogin 回來後再畫一次，
@@ -88,6 +104,7 @@ document.addEventListener('DOMContentLoaded', function () {
    */
   requireLogin().then(function () {
     renderPageNav('list');
+    renderWho();                      // v3.3 姓名／角色
     startIdleWatch();                 // v2.8 閒置自動登出
   });
   loadData();
@@ -95,21 +112,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 function wireEvents() {
-  document.getElementById('searchBtn').addEventListener('click', loadData);
+  document.getElementById('searchBtn').addEventListener('click', function () {
+    rangeKind = 'custom';              // 自己挑日期 → 範圍列顯示那兩個日期
+    closeRangePick();
+    loadData();
+  });
   document.getElementById('reloadBtn').addEventListener('click', loadData);
   document.getElementById('resetBtn').addEventListener('click', resetFilters);
 
   // 日期欄位下方那一行確認文字（一定是 dd/mm/yyyy，由我們控制）
   ['fFrom', 'fTo'].forEach(function (id) {
     const el = document.getElementById(id);
-    el.addEventListener('change', syncPickedDates);
-    el.addEventListener('input', syncPickedDates);
+    /* ⚠️ 手動改日期就不再是「本週／未來 14 天」了，範圍代號要跟著變成 custom。
+       不改的話標籤會一直寫「本週」，而查的是別的區間——
+       畫面說謊比查錯還糟，因為使用者不會去懷疑它。 */
+    const onEdit = function () { rangeKind = 'custom'; syncPickedDates(); };
+    el.addEventListener('change', onEdit);
+    el.addEventListener('input', onEdit);
   });
 
   document.querySelectorAll('#quickRange button').forEach(function (btn) {
     btn.addEventListener('click', function () {
       setQuickRange(btn.dataset.range);
+      rangeKind = btn.dataset.range;
       syncPickedDates();
+      closeRangePick();
       loadData();
     });
   });
@@ -138,6 +165,7 @@ function wireEvents() {
           .some(function (b) { return b.getAttribute('aria-pressed') === 'true'; });
         all.setAttribute('aria-pressed', String(!anyOn));
       }
+      syncStatFromChips();
       onFilterChanged();
     });
   });
@@ -150,10 +178,137 @@ function wireEvents() {
   });
   document.getElementById('fNeed').addEventListener('change', onFilterChanged);
 
-  document.getElementById('toggleMore').addEventListener('click', function () {
-    const box = document.getElementById('moreBox');
+  /* 篩選收合。⚠️ aria-expanded 要跟著改——螢幕閱讀器只看這個屬性，
+     只改 hidden 的話它會一直說「收合中」 */
+  document.getElementById('filterToggle').addEventListener('click', function () {
+    const box = document.getElementById('filterBody');
     box.hidden = !box.hidden;
+    this.setAttribute('aria-expanded', box.hidden ? 'false' : 'true');
   });
+
+  // 範圍列
+  document.getElementById('periodBar').addEventListener('click', function () {
+    const box = document.getElementById('rangePick');
+    box.hidden = !box.hidden;
+    this.setAttribute('aria-expanded', box.hidden ? 'false' : 'true');
+  });
+
+  // 統計卡：點一下依那個狀態篩選，再點一下取消
+  document.querySelectorAll('#statRow .stat-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      pickStat(statPick === card.dataset.stat ? '' : card.dataset.stat);
+    });
+  });
+
+  document.getElementById('overdueNote').addEventListener('click', showOverdueOnly);
+  document.getElementById('logoutBtn').addEventListener('click', function () { doLogout(); });
+}
+
+
+/** 登入者姓名與角色 */
+function renderWho() {
+  const p = getProfile();
+  document.getElementById('adminName').textContent = p.name || p.account || '';
+  document.getElementById('adminRole').textContent =
+    t(p.is_super ? 'adm.role.super' : 'adm.role.admin');
+}
+
+
+/** 範圍列上的文字：目前是哪個區間、幾筆 */
+function renderPeriodBar() {
+  const key = {
+    week: 'list.quick.week', next14: 'list.quick.14', month: 'list.quick.month',
+    past14: 'list.quick.past', all: 'list.range.all'
+  }[rangeKind];
+
+  const label = document.getElementById('periodLabel');
+  if (key) {
+    label.textContent = t(key);
+  } else {
+    // 自訂區間：把兩個日期寫出來（⚠️ 一律 dd/mm/yyyy，不用裝置格式）
+    const f = dmy(document.getElementById('fFrom').value);
+    const to = dmy(document.getElementById('fTo').value);
+    label.textContent = (f || '…') + ' – ' + (to || '…');
+  }
+  document.getElementById('periodCount').textContent =
+    allItems.length ? t('list.countAll', { n: allItems.length }) : '';
+}
+
+/** 把範圍選單收起來（選完就收，不要擋住下面的資料） */
+function closeRangePick() {
+  document.getElementById('rangePick').hidden = true;
+  document.getElementById('periodBar').setAttribute('aria-expanded', 'false');
+}
+
+
+/** 'YYYY-MM-DD' → 'dd/mm/yyyy'（空的回空字串） */
+function dmy(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + '/' + m[2] + '/' + m[1]) : '';
+}
+
+
+/**
+ * 按統計卡。
+ *
+ * ⚠️ 統計卡與「其他篩選」裡的狀態按鈕是**同一件事的兩個入口**。
+ *    只改其中一邊的話，畫面上會出現「卡片是亮的、狀態按鈕卻寫全部」，
+ *    使用者完全不知道現在到底篩了什麼。
+ */
+function pickStat(kind) {
+  statPick = kind;
+
+  // TODO ＝待定＋待改期（兩個狀態合起來才是「還沒定案、要去追的」）
+  const want = kind === 'TODO' ? ['INCOMPLETE', 'PENDING']
+             : kind ? [kind] : [];
+
+  document.querySelectorAll('#fStatus button').forEach(function (b) {
+    const v = b.dataset.val;
+    b.setAttribute('aria-pressed', want.length ? (want.indexOf(v) >= 0 ? 'true' : 'false')
+                                               : (v === '' ? 'true' : 'false'));
+  });
+  syncStatCards();
+  onFilterChanged();
+}
+
+
+/**
+ * 反方向：從「其他篩選」裡的狀態按鈕推回統計卡。
+ *
+ * ⚠️ pickStat() 只做了「卡片 → 按鈕」那一半。少了這一支，
+ *    直接改狀態按鈕時卡片還亮著舊的那一張，畫面上會出現
+ *    「卡片寫待處理、按鈕寫已取消」這種互相矛盾的狀態，
+ *    而且**不會報錯**——使用者完全不知道現在到底篩了什麼。
+ */
+function syncStatFromChips() {
+  const on = currentStatuses().slice().sort().join(',');
+  statPick = on === 'INCOMPLETE,PENDING' ? 'TODO'
+           : on === 'SCHEDULED' ? 'SCHEDULED'
+           : on === 'DONE' ? 'DONE' : '';
+  syncStatCards();
+}
+
+
+/** 讓統計卡的反白跟著狀態按鈕走（不管是從哪一邊改的） */
+function syncStatCards() {
+  document.querySelectorAll('#statRow .stat-card').forEach(function (c) {
+    c.setAttribute('aria-pressed', c.dataset.stat === statPick ? 'true' : 'false');
+  });
+}
+
+
+/**
+ * 按逾期提示：切到「全部」範圍，並只留下逾期那些。
+ *
+ * ⚠️ 一定要順便把範圍切成「全部」——逾期的資料在過去，
+ *    而預設範圍是未來 14 天，只改篩選的話按下去會是一片空白。
+ */
+function showOverdueOnly() {
+  setQuickRange('all');
+  rangeKind = 'all';
+  syncPickedDates();
+  pickStat('TODO');
+  loadData();
 }
 
 
@@ -271,6 +426,8 @@ async function loadData() {
     saveFilters();
     buildSelectOptions();
     applyFilters();
+    renderPeriodBar();
+    renderOverdueNote();
 
     // 截斷警告要顯眼，不能混在灰色小字裡——他必須知道自己看到的不是全部。
     // ⚠️ 放在這裡而不是 render()：render() 每動一次篩選就跑一次，
@@ -531,6 +688,8 @@ function renderStatLine() {
   const drop = viewItems.filter(function (i) { return i.arah === 'DROPOFF'; }).length;
   const late = viewItems.filter(isOverdue).length;
   const el = document.getElementById('statLine');
+  /* ⚠️ 「接 N · 送 M」一定要留著。v3.3 的統計卡改成流程狀態（使用者選的方案 B），
+     而派車調度要看的是方向——那個數字不能因為換了卡片就不見。 */
   el.textContent =
     t('list.countOf', { n: viewItems.length, total: allItems.length }) +
     '　' + t('list.stat', { a: pick, b: drop }) +
@@ -538,6 +697,63 @@ function renderStatLine() {
     // 看久了就變成背景，真的有 1 筆時也不會被注意到
     (late ? '　' + t('list.overdueN', { n: late }) : '');
   el.classList.toggle('statline--alert', late > 0);
+
+  renderStatCards();
+  renderFilterCount();
+}
+
+
+/**
+ * 三張統計卡（方案 B：流程狀態）。
+ *
+ * ⚠️ 算的是 **allItems**（目前範圍的全部）不是 viewItems（篩選後）——
+ *    卡片是拿來「決定要篩什麼」的，跟著篩選結果變的話，
+ *    按下「待處理」之後另外兩張就變成 0，看起來像資料不見了。
+ */
+function renderStatCards() {
+  const n = (fn) => allItems.filter(fn).length;
+  document.getElementById('statTodo').textContent =
+    n(function (i) { return i.status === 'INCOMPLETE' || i.status === 'PENDING'; });
+  document.getElementById('statSched').textContent =
+    n(function (i) { return i.status === 'SCHEDULED'; });
+  document.getElementById('statDone').textContent =
+    n(function (i) { return i.status === 'DONE'; });
+  syncStatCards();
+}
+
+
+/**
+ * 收合起來的篩選有幾個條件生效。
+ *
+ * ⚠️ 沒有這個數字的話，管理者把篩選收起來之後會忘記自己還開著條件，
+ *    然後以為資料不見了——這是「預設收合」唯一的代價，一定要補上。
+ */
+function renderFilterCount() {
+  let n = 0;
+  if (document.getElementById('fKeyword').value.trim()) n++;
+  if (document.getElementById('fFlight').value.trim()) n++;
+  if (document.getElementById('fNeed').checked) n++;
+  ['fFactory', 'fDept', 'fTitik'].forEach(function (id) {
+    if (document.getElementById(id).value) n++;
+  });
+  if (document.querySelector('#fArah button[data-val=""]').getAttribute('aria-pressed') !== 'true') n++;
+  if (document.querySelector('#fStatus button[data-val=""]').getAttribute('aria-pressed') !== 'true') n++;
+
+  const tag = document.getElementById('filterCount');
+  tag.textContent = n;
+  tag.hidden = !n;
+}
+
+
+/**
+ * 逾期提示。⚠️ 顯示的是後端算的**全部期間**筆數（overdue_all），
+ * 不是目前範圍內的——理由見 admin-list.html 與 gas/AdminList.js 的說明。
+ */
+function renderOverdueNote() {
+  const n = Number(meta.overdue_all || 0);
+  const el = document.getElementById('overdueNote');
+  el.textContent = n ? t('list.overdueAll', { n: n }) : '';
+  el.hidden = !n;
 }
 
 
@@ -719,7 +935,11 @@ function saveFilters() {
       dept:    document.getElementById('fDept').value,
       titik:   document.getElementById('fTitik').value,
       need:    document.getElementById('fNeed').checked,
-      sort:    document.getElementById('fSort').value
+      sort:    document.getElementById('fSort').value,
+      /* ⚠️ 範圍代號也要存。只存 from/to 的話，重新整理後範圍列會顯示
+         那兩個日期而不是「本週」——查的是對的，但標籤退化了。 */
+      rangeKind: rangeKind,
+      statPick:  statPick
     }));
   } catch (e) { /* 存不進去只是重新整理後條件要重設，不影響當下操作 */ }
 }
@@ -753,9 +973,16 @@ function restoreFilters() {
     // 廠別／部門／上車地點的選項還沒建（要等資料回來），先記著
     pendingSelects = { fFactory: f.factory || '', fDept: f.dept || '', fTitik: f.titik || '' };
 
-    // 「更多篩選」裡有設定過的話就自動展開，不然他會找不到自己上次設了什麼
-    if (f.flight || f.factory || f.dept || f.titik || f.need) {
-      document.getElementById('moreBox').hidden = false;
+    if (f.rangeKind) rangeKind = f.rangeKind;
+    statPick = f.statPick || '';
+
+    /* 「其他篩選」裡有設定過的話就自動展開，不然他會找不到自己上次設了什麼。
+       ⚠️ 這比 v3.3 之前更重要——現在**預設是收合的**，
+          不展開的話上次設的條件完全看不見，只剩下右上角那個數字。 */
+    if (f.flight || f.factory || f.dept || f.titik || f.need ||
+        (Array.isArray(f.status) && f.status.length) || f.arah) {
+      document.getElementById('filterBody').hidden = false;
+      document.getElementById('filterToggle').setAttribute('aria-expanded', 'true');
     }
   } catch (e) { return false; }
 
@@ -780,6 +1007,7 @@ function resetFilters() {
   document.querySelectorAll('#fStatus button').forEach(function (b) {
     b.setAttribute('aria-pressed', String(!b.dataset.val));
   });
+  statPick = '';                       // 統計卡的反白也要跟著清掉
   showMsg('', '');
   onFilterChanged();
 }
