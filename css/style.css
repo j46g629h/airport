@@ -146,6 +146,10 @@ body {
   padding: var(--gap);
 }
 
+/* 桌機把內容放寬（v3.2）。1920px 上原本只用掉 40% 的寬度，兩側各空 580px。
+   ⚠️ 不是拉滿——一行超過約 90 個字就難讀了。960px 是「用得夠多、又還讀得順」。 */
+@media screen and (min-width: 761px) { .wrap { max-width: 960px; } }
+
 /* 登入這種只有一欄表單的頁面，寬度收窄比較好讀 */
 .wrap--narrow { max-width: 460px; }
 
@@ -187,12 +191,15 @@ a { color: var(--action); }
 .wordmark {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 5px;
   flex: 0 0 auto;                  /* 標誌不可以被壓縮，要縮的是標題 */
+  /* 在這裡定一次字級，底下的 b / i 都用 em 相對它——
+     這樣位移量會跟著字級一起縮放（見下方 .wordmark i 的說明） */
+  font-size: var(--fs-lg);
 }
 
 .wordmark b {
-  font-size: var(--fs-lg);
+  font-size: 1em;
   font-weight: 800;
   letter-spacing: .02em;
   color: var(--text);
@@ -200,15 +207,34 @@ a { color: var(--action); }
 
 /* ⚠️ <i> 只是拿來把 GA 分出來，不是要斜體，所以要關掉 font-style。
       白字黑底的小方塊跟 favicon 的圓角黑底是同一個形狀語言。 */
+/* GA：小一號、細字、等寬字體，**上緣對齊 PCI**（v3.2，使用者要求）。
+ *
+ * ⚠️ 位移量**一定要用 em，不可以寫死 px**。
+ *    --fs-lg 是 clamp(17px … 20px)，會隨視窗寬度變——寫死 5px 的話
+ *    桌機對得剛好，手機上就歪掉，而且沒有人會注意到。
+ *
+ * 算法（用 canvas 的 actualBoundingBoxAscent 實測出來的）：
+ *    PCI 大寫高 = 0.70 × 字級；GA（等寬字）= 0.75 × 字級
+ *    GA 設成 0.6em → 要往上推 (0.70 − 0.75 × 0.6) = 0.25 個 PCI 字級
+ *                            = 0.25 / 0.6 = 0.42 個 GA 字級
+ *    所以 top: -.42em（em 相對 GA 自己的字級）。
+ *    實測 1920px 推 5.04px、390px 推 4.43px，兩邊都對齊。
+ *
+ * ⚠️ 用 position 不用 margin：margin 會把後面的「機場接送系統」一起推歪。
+ *
+ * ⚠️ 字型用等寬字而不是載外部字型：這個專案是零建置流程，
+ *    載 Google Fonts 要多一次網路請求，工廠 wifi 上會先閃一下沒字型的樣子。
+ *    等寬字每一台裝置都有，跟 PCI 的無襯線體差異也夠明顯。
+ */
 .wordmark i {
   font-style: normal;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  color: var(--surface);
-  background: var(--action);
-  padding: 3px 5px;
-  border-radius: 5px;
+  font-size: .6em;
+  font-weight: 400;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  position: relative;
+  top: -.42em;
+  letter-spacing: .12em;
+  color: var(--text-muted);
 }
 
 .topbar .brand {
@@ -347,6 +373,20 @@ a { color: var(--action); }
   cursor: pointer;
 }
 
+/* 桌機加大（v3.2，使用者要求）。
+   ⚠️ **只加大桌機。** 手機維持 48px（--tap-min）——那是「戴手套點得到」的
+      下限，再加大會把標題擠出畫面（v2.4 踩過的那個頂列 bug）。 */
+@media screen and (min-width: 761px) {
+  .lang { gap: 6px; }
+  .lang button {
+    min-height: 52px;
+    padding: 0 22px;
+    font-size: 16px;
+    font-weight: 600;
+    border-width: 1.5px;
+  }
+}
+
 .lang button[aria-pressed="true"] {
   background: var(--action);
   border-color: var(--action);
@@ -382,6 +422,23 @@ a { color: var(--action); }
   box-shadow: var(--lift-1);
 }
 
+/* 內容在左、箭頭在右（v3.2）。右邊那塊空白就有東西了。 */
+.entry { display: flex; align-items: center; gap: var(--pad-card); }
+.entry .entry-body { flex: 1 1 auto; min-width: 0; }   /* 防禦規則第 3 條 */
+
+/* 細箭頭（v3.2，使用者提供參考圖）。
+   ⚠️ 它不是裝飾，是「按這裡會前往」的指示——**手機也要有**，只是小一點。
+      先前想過放飛機／鑰匙那種大圖示，但那會把手機的文字擠窄、折行變多。 */
+.entry .entry-icon {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  color: var(--text-muted);
+  transition: transform .15s;
+}
+.entry .entry-icon svg { width: 100%; height: 100%; display: block; }
+.entry:hover .entry-icon { transform: translateX(4px); }
+
 .entry:hover { box-shadow: var(--lift-2); }
 .entry .entry-title { font-size: var(--fs-lg); font-weight: 700; }
 .entry .entry-desc { color: var(--text-muted); font-size: var(--fs-sm); }
@@ -402,8 +459,10 @@ a { color: var(--action); }
 /* 「只查得到今天以後」這一條。它是**限制**不是功能，所以跟上面的清單
    分開、用不同的顏色——混在清單裡的話會被當成第四項功能讀過去。 */
 .entry .entry-note {
-  margin-top: 10px;
-  padding-top: 8px;
+  /* ⚠️ 加強這條線靠的是**間距**，不是線本身。
+     貼太近的話它會被上下的文字「吃掉」，拉開之後同一條線就明顯了。 */
+  margin-top: 18px;
+  padding-top: 16px;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: var(--fs-sm);
@@ -437,7 +496,110 @@ a { color: var(--action); }
 .entry--primary .entry-note { color: rgba(255, 255, 255, .82); }
 /* 圓點原本是 --action（近黑），在黑底上會整個消失 */
 .entry--primary .entry-list li::marker { color: rgba(255, 255, 255, .55); }
-.entry--primary .entry-note { border-top-color: rgba(255, 255, 255, .22); }
+/* .22 在深色底上幾乎看不見（使用者反映）。提到 .40 才讀得出來 */
+.entry--primary .entry-note { border-top-color: rgba(255, 255, 255, .40); }
+/* ⚠️ 箭頭用 currentColor 畫，在深色卡片裡會繼承到近黑的文字色——
+   等於把它畫在黑底上，完全看不見而且不會報錯。深色卡片一定要單獨指定。 */
+.entry--primary .entry-icon { color: rgba(255, 255, 255, .70); }
+
+/* 桌機把字級與內距放大（v3.2，使用者反映「字體偏小」）。
+   ⚠️ 只動桌機。手機上 15px 是刻意的，改大會讓折行變多。 */
+@media screen and (min-width: 761px) {
+  .entry { padding: 30px; }
+  .entry .entry-title { font-size: 26px; }
+  .entry .entry-desc,
+  .entry .entry-list,
+  .entry .entry-note { font-size: 17px; }
+}
+
+
+/* ===== 操作說明入口與說明頁（v3.2）===== */
+
+/* 「怎麼使用？」——輕量連結，不是第三張卡片。
+   ⚠️ 兩張卡片的份量差異（近黑實心 vs 淺色平面）是為了讓人兩秒內決定要按哪個。
+      做成第三張同等份量的卡片會把這個層次打散。作法沿用員工餐廳系統。 */
+.menu-help {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--tap-min);        /* 它是連結，一樣要點得到 */
+  margin: 4px 0 var(--gap);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+.menu-help:hover { color: var(--text); text-decoration: underline; }
+.menu-help-icon { width: 20px; height: 20px; flex: 0 0 auto; }
+
+/* 說明頁的四個步驟。編號在左、內容在右 */
+.lead {
+  margin: 0 0 var(--sec-gap);
+  color: var(--text-muted);
+  font-size: var(--fs-body);
+}
+
+.step {
+  display: flex;
+  gap: 14px;
+  padding: var(--pad-card);
+  margin-bottom: var(--gap);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.step-no {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--action);
+  color: var(--surface);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+}
+.step-body { flex: 1 1 auto; min-width: 0; }   /* 防禦規則第 3 條 */
+.step-body h2 { font-size: var(--fs-lg); margin: 2px 0 .5em; }
+.step-body h3 { font-size: var(--fs-body); margin: 1.2em 0 .4em; }
+.step-body p { margin: 0 0 .8em; }
+.step-body p:last-child { margin-bottom: 0; }
+.step-body .entry-list { margin-top: 0; }
+
+/* 提示框（打到 @ 前面就好）與警告框（凌晨航班）。
+   ⚠️ 兩者顏色不同是刻意的：一個是「這樣比較方便」，
+      另一個是「不照做會錯過車」。同一種顏色會讓後者被當成前者讀過去。 */
+.hintbox, .warnbox {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+.hintbox { background: var(--info-bg);  border-color: var(--info-border);  color: var(--info); }
+.warnbox { background: var(--warn-bg);  border-color: var(--warn-border);  color: var(--warn); font-weight: 600; }
+
+/* 狀態對照表。徽章一欄、說明一欄 */
+.statusdoc {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 14px;
+  align-items: start;
+  margin: 0 0 .8em;
+}
+.statusdoc dt { min-width: 0; }
+/* ⚠️ .badge 預設 margin-left:auto（列表卡片要它靠右）。在這裡要取消，
+   不然徽章會被推到欄位最右邊，跟右邊的說明文字黏在一起 */
+.statusdoc dt .badge { margin-left: 0; white-space: nowrap; }
+.statusdoc dd { margin: 0; min-width: 0; font-size: var(--fs-sm); line-height: 1.55; }
+
+@media screen and (max-width: 420px) {
+  /* 窄螢幕：徽章與說明改成上下排，兩欄各自都太窄的話反而難讀 */
+  .statusdoc { grid-template-columns: 1fr; gap: 4px; }
+  .statusdoc dd { margin-bottom: 10px; }
+}
 
 
 /* ===== 表單 ===== */

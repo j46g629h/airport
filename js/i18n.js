@@ -25,6 +25,41 @@ const I18N = {
     'home.query.note':  'Hanya jadwal mulai hari ini. Untuk jadwal yang sudah lewat, hubungi GA.',
     'home.admin.title': 'Area Admin',
     'home.admin.desc':  'Tambah, ubah, hapus data antar jemput (perlu akun)',
+    'home.admin.note':  'Admin biasa: input dan perawatan jadwal. Super admin: ditambah kelola akun dan laporan sistem.',
+    'home.help':        'Gimana caranya?',
+
+    'help.title':       'Gimana caranya?',
+    'help.lead':        'Halaman ini menjelaskan cara mengecek jadwal antar jemput Anda. Tidak perlu akun, tidak perlu kata sandi.',
+
+    'help.s1.title':    'Cari jadwal Anda sendiri',
+    'help.s1.p1':       'Buka "Cek Jadwal Saya", pilih tab Alamat email, lalu ketik email Anda.',
+    'help.s1.tip':      'Tidak perlu lengkap — ketik bagian sebelum tanda @ sudah cukup. Contoh: untuk linda.lim@pci.co.id, ketik linda.lim saja.',
+    'help.s1.p2':       'Keluarga yang memakai email yang sama akan ikut tampil, jadi satu kali cari sudah terlihat semua.',
+
+    'help.s2.title':    'Membaca hasilnya',
+    'help.s2.p1':       'Yang paling penting adalah status. Status memberi tahu Anda apakah jadwal ini sudah pasti atau belum:',
+    'help.st.scheduled':'Sudah pasti. Semua data lengkap — datang saja sesuai jam yang tertulis.',
+    'help.st.done':     'Sudah selesai. Pesawatnya sudah berangkat atau tiba.',
+    'help.st.incomplete':'Data belum lengkap (tanggal atau nomor penerbangan belum pasti). Jam yang tampil belum bisa dipakai — hubungi bagian GA.',
+    'help.st.pending':  'Akan diubah jadwalnya, tanggal baru belum ditentukan. Hubungi bagian GA.',
+    'help.st.cancelled':'Dibatalkan. Tidak ada mobil untuk jadwal ini.',
+
+    'help.s2.check':    'Mohon dicek sekali lagi',
+    'help.s2.checkP':   'Tanggal, jam dari PCI, titik jemput dan nomor penerbangan ditampilkan supaya Anda bisa memeriksa sendiri. Kalau ada yang tidak sesuai, segera hubungi bagian GA — lebih cepat diketahui, lebih mudah diperbaiki.',
+    'help.s2.c1':       'Tanggal dan nomor penerbangan — apakah sama dengan tiket Anda?',
+    'help.s2.c2':       'Jam dari PCI — jam berapa mobil berangkat dari pabrik.',
+    'help.s2.c3':       'Titik jemput — di mana Anda naik mobil.',
+    'help.s2.midnight': 'Perhatian: untuk penerbangan dini hari, mobil berangkat MALAM SEBELUMNYA. Contoh: pesawat tanggal 04/09 jam 00:20, mobil berangkat 03/09 jam 20:00. Kalau "Jam dari PCI" mencantumkan tanggal, ikuti tanggal itu — bukan tanggal penerbangan.',
+
+    'help.s3.title':    'Lihat siapa saja yang satu pesawat',
+    'help.s3.p1':       'Pakai tab Tanggal Pesawat atau NO Pesawat. Berguna untuk tahu siapa yang bisa berangkat bersama satu mobil.',
+
+    'help.s4.title':    'Kalau tidak ketemu',
+    'help.s4.c1':       'Yang tampil hanya jadwal mulai hari ini. Jadwal yang sudah lewat tidak muncul.',
+    'help.s4.c2':       'Ketikan email terlalu pendek — minimal 3 huruf.',
+    'help.s4.c3':       'Masih tidak ketemu, atau datanya salah: hubungi bagian GA, ext 3690.',
+
+    'help.cta':         'Sudah paham? Langsung cek jadwal Anda.',
 
     'query.title':     'Cek Jadwal',
     'query.tab.email': 'Email',
@@ -276,6 +311,41 @@ const I18N = {
     'home.query.note':  '只查得到今天以後的行程。已經過去的行程請洽窗口。',
     'home.admin.title': '管理者專區',
     'home.admin.desc':  '新增、修改、刪除接送資料（需要帳號密碼）',
+    'home.admin.note':  '一般管理者：班表輸入與維護。超級管理者：另加帳號管理與系統報表。',
+    'home.help':        '怎麼使用？',
+
+    'help.title':       '怎麼使用？',
+    'help.lead':        '這一頁說明怎麼查自己的接送安排。不需要帳號，也不需要密碼。',
+
+    'help.s1.title':    '查自己的行程',
+    'help.s1.p1':       '打開「查詢我的行程」，選「電子郵件」分頁，輸入你的信箱。',
+    'help.s1.tip':      '不用打完整——打到 @ 前面那一段就夠了。例如 linda.lim@pci.co.id，只要打 linda.lim。',
+    'help.s1.p2':       '共用同一個信箱的家屬會一起出現，查一次就看得到全家的安排。',
+
+    'help.s2.title':    '看懂查詢結果',
+    'help.s2.p1':       '最重要的是狀態。它告訴你這一筆到底定了沒有：',
+    'help.st.scheduled':'已經定案。資訊都齊了，照上面的時間出來就好。',
+    'help.st.done':     '已經結束。飛機已經起飛或抵達了。',
+    'help.st.incomplete':'資訊還沒齊（航班日期或航班號還沒定）。畫面上的時間還不能照，請洽總務。',
+    'help.st.pending':  '要改期，新日期還沒定。請洽總務。',
+    'help.st.cancelled':'已經取消。這一筆不會有車。',
+
+    'help.s2.check':    '請你再核對一次',
+    'help.s2.checkP':   '日期、出廠時間、上車地點、航班號會顯示出來，是為了讓你自己核對。發現跟你知道的不一樣，請立刻洽總務——越早發現越好改。',
+    'help.s2.c1':       '日期與航班號——跟你的機票一樣嗎？',
+    'help.s2.c2':       '出廠時間——車子幾點從工廠出發。',
+    'help.s2.c3':       '上車地點——你在哪裡上車。',
+    'help.s2.midnight': '特別注意：凌晨的班機，車子是前一天晚上出發。例如飛機是 04/09 00:20，車子 03/09 20:00 就要走。「出廠時間」有寫日期的話，請照那個日期，不是照航班日期。',
+
+    'help.s3.title':    '查同班機還有誰',
+    'help.s3.p1':       '用「航班日期」或「航班號」分頁查。可以知道有誰跟你同一班，能不能一起搭車。',
+
+    'help.s4.title':    '查不到怎麼辦',
+    'help.s4.c1':       '只查得到今天以後的行程，已經過去的不會出現。',
+    'help.s4.c2':       '電子郵件打太少——至少要 3 個字。',
+    'help.s4.c3':       '還是查不到、或資料不對：請洽總務，分機 3690。',
+
+    'help.cta':         '看完了？直接去查自己的行程。',
 
     'query.title':     '查詢接送',
     'query.tab.email': '電子郵件',

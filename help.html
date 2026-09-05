@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#EFEFED">
+<meta name="robots" content="noindex, nofollow">
+<!-- 圖示與主畫面設定的完整說明在 index.html 的 <head> -->
+<link rel="icon" href="favicon.svg?v=3.2" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3.2">
+<link rel="manifest" href="manifest.json?v=3.2">
+<!-- CSS 還沒下載完之前先鋪底色，避免工廠 wifi 慢時先白閃一下 -->
+<style>html{background:#EFEFED}</style>
+<title>Panduan — PCI Antar Jemput Bandara</title>
+<link rel="stylesheet" href="css/style.css?v=3.2">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="backbtn" href="index.html">
+    <span aria-hidden="true">←</span>
+    <span class="word" data-i18n="nav.home">Beranda</span>
+  </a>
+  <span class="brand" data-i18n="app.name">Antar Jemput Bandara</span>
+  <nav class="lang" aria-label="Language">
+    <button type="button" data-lang="id" aria-pressed="true">ID</button>
+    <button type="button" data-lang="zh" aria-pressed="false">中</button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <h1 data-i18n="help.title">Gimana caranya?</h1>
+  <p class="lead" data-i18n="help.lead"></p>
+
+  <!--
+    ⚠️ 這一頁**刻意不放截圖**（使用者 2026-09-05 確認）。
+       截圖會安靜地過期：v3.1 才剛把桌機列表從 8 欄改成 6 欄，
+       在那之前截的圖現在全是錯的，而且不會有任何人發現。
+       示範用的徽章、按鈕都用**真的 CSS 元件**畫出來——
+       它們會跟著系統一起變，永遠不會跟畫面對不起來。
+  -->
+
+  <!-- ① 查自己的行程 -->
+  <section class="step">
+    <div class="step-no" aria-hidden="true">1</div>
+    <div class="step-body">
+      <h2 data-i18n="help.s1.title"></h2>
+      <p data-i18n="help.s1.p1"></p>
+      <p class="hintbox" data-i18n="help.s1.tip"></p>
+      <p data-i18n="help.s1.p2"></p>
+    </div>
+  </section>
+
+  <!-- ② 看懂結果：重點在狀態（使用者 2026-09-05 指定） -->
+  <section class="step">
+    <div class="step-no" aria-hidden="true">2</div>
+    <div class="step-body">
+      <h2 data-i18n="help.s2.title"></h2>
+      <p data-i18n="help.s2.p1"></p>
+
+      <!-- 狀態對照。徽章用的是全站同一套 .badge 樣式，不是另外畫的 -->
+      <dl class="statusdoc">
+        <dt><span class="badge badge--scheduled" data-i18n="status.SCHEDULED"></span></dt>
+        <dd data-i18n="help.st.scheduled"></dd>
+
+        <dt><span class="badge badge--done" data-i18n="status.DONE"></span></dt>
+        <dd data-i18n="help.st.done"></dd>
+
+        <dt><span class="badge badge--incomplete" data-i18n="status.INCOMPLETE"></span></dt>
+        <dd data-i18n="help.st.incomplete"></dd>
+
+        <dt><span class="badge badge--pending" data-i18n="status.PENDING"></span></dt>
+        <dd data-i18n="help.st.pending"></dd>
+
+        <dt><span class="badge badge--cancelled" data-i18n="status.CANCELLED"></span></dt>
+        <dd data-i18n="help.st.cancelled"></dd>
+      </dl>
+
+      <h3 data-i18n="help.s2.check"></h3>
+      <p data-i18n="help.s2.checkP"></p>
+      <ul class="entry-list">
+        <li data-i18n="help.s2.c1"></li>
+        <li data-i18n="help.s2.c2"></li>
+        <li data-i18n="help.s2.c3"></li>
+      </ul>
+
+      <!-- ⚠️ 這一條是實際資料裡 8 筆會踩到的坑，也是最容易讓人錯過車的一件事 -->
+      <p class="warnbox" data-i18n="help.s2.midnight"></p>
+    </div>
+  </section>
+
+  <!-- ③ 查同班機 -->
+  <section class="step">
+    <div class="step-no" aria-hidden="true">3</div>
+    <div class="step-body">
+      <h2 data-i18n="help.s3.title"></h2>
+      <p data-i18n="help.s3.p1"></p>
+    </div>
+  </section>
+
+  <!-- ④ 查不到怎麼辦 -->
+  <section class="step">
+    <div class="step-no" aria-hidden="true">4</div>
+    <div class="step-body">
+      <h2 data-i18n="help.s4.title"></h2>
+      <ul class="entry-list">
+        <li data-i18n="help.s4.c1"></li>
+        <li data-i18n="help.s4.c2"></li>
+        <li data-i18n="help.s4.c3"></li>
+      </ul>
+    </div>
+  </section>
+
+  <a class="entry entry--primary" href="query.html">
+    <div class="entry-body">
+      <div class="entry-title" data-i18n="home.query.title">Cek Jadwal Saya</div>
+      <div class="entry-desc" data-i18n="help.cta"></div>
+    </div>
+    <span class="entry-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 12h15"/><path d="M13 6l6 6-6 6"/>
+      </svg>
+    </span>
+  </a>
+
+  <footer class="foot">
+    <div id="footInfo"></div>
+  </footer>
+
+</main>
+
+<script src="js/config.js?v=3.2"></script>
+<script src="js/i18n.js?v=3.2"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', initLangSwitch);
+</script>
+
+</body>
+</html>
